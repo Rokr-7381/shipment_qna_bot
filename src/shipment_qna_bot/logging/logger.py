@@ -1,150 +1,63 @@
-# src/shimpemt_qna_bot/logging/logger.py
-
-import os
-import warnings
-
-# from dotenv import load_dotenv, find_dotenv # type: ignore
-# load_dotenv(find_dotenv(), override=True)
-
-
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-
 import contextvars
+import json
 import logging
-from logging.handlers import RotatingFileHandler
-from typing import Iterable, List, Optional  # type: ignore
+import sys
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
-# from shipment_qna_bot.logging.formatter import ShipmentQnaFormatter
-from .formatter import ShipmentQnaFormatter
-
-# context variables for logging
-trace_id_var: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "trace_id", default="-"
-)
-conversation_id_var: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "conversation_id", default="-"
-)
-intent_var: contextvars.ContextVar[str] = contextvars.ContextVar("intent", default="-")
-consignee_codes_var: contextvars.ContextVar[str] = contextvars.ContextVar("consignee_codes", default=[])  # type: ignore
+# Context variables for request tracing
+trace_id_ctx = contextvars.ContextVar("trace_id", default=None)
+conversation_id_ctx = contextvars.ContextVar("conversation_id", default=None)
+consignee_scope_ctx = contextvars.ContextVar("consignee_scope", default=None)
 
 
-class ContextFilter(logging.Filter):
+class JSONFormatter(logging.Formatter):
     """
-    Injects contextvars into every LogRecord so formatter can access into the log.
+    Formatter that outputs JSON strings with context.
     """
 
-    def filter(self, record: logging.LogRecord) -> bool:
-        record.trace_id = trace_id_var.get()
-        record.conversation_id = conversation_id_var.get()
-        record.intent = intent_var.get()
-        consignee_codes = consignee_codes_var.get() or []  # type: ignore
-        if isinstance(consignee_codes, (list, tuple)):
-            record.consignee_codes = ",".join(str(c) for c in consignee_codes)  # type: ignore
-        else:
-            record.consignee_codes = str(consignee_codes)
-        return True
+    def format(self, record: logging.LogRecord) -> str:
+        log_record = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "trace_id": trace_id_ctx.get(),
+            "conversation_id": conversation_id_ctx.get(),
+            "consignee_scope": consignee_scope_ctx.get(),
+        }
+
+        # Add extra fields from record if available
+        if hasattr(record, "extra_data"):
+            log_record.update(record.extra_data)
+
+        if record.exc_info:
+            log_record["exception"] = self.formatException(record.exc_info)
+
+        return json.dumps(log_record)
 
 
-def set_log_context(
-    *,
-    trace_id: Optional[str] = None,
-    conversation_id: Optional[str] = None,
-    intent: Optional[str] = None,
-    consignee_codes: Optional[Iterable[str]] = None,
-    **extra: object,  # for any unexpected kwargs
-) -> None:
+def setup_logger(name: str = "shipment_qna_bot", level: str = "INFO") -> logging.Logger:
     """
-    Set or Update logging context for current request / graph execution.
-
-    Call sign:
-    - in FastAPI middleware (per request)
-    - at graph entry when we know conversational_id / intent
+    Configures and returns a logger with JSON formatting.
     """
-    if trace_id is not None:
-        trace_id_var.set(trace_id)
-    if conversation_id is not None:
-        conversation_id_var.set(conversation_id)
-    if intent is not None:
-        intent_var.set(intent)
-    if consignee_codes is not None:
-        consignee_codes_var.set(list(consignee_codes))  # type: ignore
+    logger = logging.getLogger(name)
 
+    # clear existing handlers to avoid duplicates
+    if logger.handlers:
+        logger.handlers.clear()
 
-_logger: Optional[logging.Logger] = None
+    logger.setLevel(level.upper())
 
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(JSONFormatter())
+    logger.addHandler(handler)
 
-def get_logger() -> logging.Logger:  # type: ignore
-    """_summary_: Store process execution steps in context variable for logging.
+    # Prevent propagation to root logger to avoid double logging if root is configured
+    logger.propagate = False
 
-    Returns:
-        logging.Logger: _description_: Return the singleton logger instance with custome formatter and context filter.
-    """
-    global _logger
-    if _logger is not None:  # type: ignore
-        return _logger  # type: ignore
-
-    logger = logging.getLogger("shipment_qna_bot")
-    # logger.setLevel(logging.DEBUG)
-    logger.setLevel(os.getenv("LOG_LEVEL", "INFO").upper())  # type: ignore
-    logger.propagate = False  # prevent double logging if root logger
-
-    # clear if any previous broken handlers was present
-    logger.handlers.clear()
-
-    # ensure Logs direcory exists to hold log files
-    logs_dir = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs"
-    )
-    os.makedirs(logs_dir, exist_ok=True)
-
-    # create formatter
-    formatter = ShipmentQnaFormatter()
-
-    # create console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-
-    # rotating file handler
-    file_path = os.path.join(logs_dir, "app.log")
-    file_handler = RotatingFileHandler(  # type: ignore
-        file_path, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"  # 10 MB
-    )
-    file_handler.setFormatter(formatter)
-
-    # add context filter
-    context_filter = ContextFilter()
-    console_handler.addFilter(context_filter)
-    file_handler.addFilter(context_filter)
-
-    # add handlers to logger
-    logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
-
-    _logger = logger
     return logger
 
 
-# convenience alias module-level logger
-logger = get_logger()  # type: ignore
-
-
-# test cases and application:
-# useage inside the app
-##############################
-
-# from shipment_qna_bot.logging.logger import logger
-
-# logger.info("Starting HybridRetriever with k=8", extra={"step": "NODE:HybridRetriever"}) # type: ignore
-# logger.error("Azure Search call failed", extra={"step": "TOOL:AzureSearch"}, exc_info=True) # type: ignore
-
-# set context once per request / graph execution
-################################################
-
-# from shipment_qna_bot.logging.logger import set_log_context
-
-# set_log_context(
-#     trace_id="uuid-...",
-#     conversation_id="conversation-uuid",
-#     intent="status",
-#     consignee_codes=["PARENT(0001)", "CHILD(0002)"]
-# ) # type: ignore
+# Global logger instance
+logger = setup_logger()

@@ -1,76 +1,65 @@
-# src/shipment_qna_bot/logging/graph_tracing.py
+from typing import Any, Dict, List, Optional, Union
+from uuid import UUID
 
-import time
-from contextlib import contextmanager
-from typing import Any, Dict
+from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.outputs import LLMResult
 
 from shipment_qna_bot.logging.logger import logger
 
-# from .logger import logger
 
-
-# summarized current state
-def _summarize_state(state: Dict[str, Any]) -> str:
+class GraphTracingCallbackHandler(BaseCallbackHandler):
     """
-    Light-weight summary of state for logs.
+    Callback handler to log LangGraph/LangChain events.
     """
-    # keys adjustment based on dataclass of state
-    keys_of_interest = [
-        "intent",
-        "normalized_question",
-        "consignee_codes",
-    ]
-    parts = []
-    for key in keys_of_interest:
-        if key in state and state[key]:
-            parts.append(f"{key}={state[key]}")  # type: ignore
-    return ", ".join(parts) if parts else "<no-key-state>"  # type: ignore
 
-
-@contextmanager  # type: ignore
-def log_node_execution(node_name: str, state_snapshot: Dict[str, Any]) -> None:  # type: ignore
-    """
-    Context manager to wrap each LangGaraph node
-    Usage:
-    - with log_node_execution("RetrievalPlanner", state.to_dict()):
-    ...node logic ...
-    """
-    step = f"NODE:{node_name}"
-    summary = _summarize_state(state_snapshot)
-
-    logger.info(f"Entering node with state: {summary}", extra={"step": step})
-
-    start = time.perf_counter()
-    try:
-        yield  # type: ignore
-    except Exception:
-        duration_ms = (time.perf_counter() - start) * 1000
-        logger.error(
-            f"Node raised exeception after {duration_ms: .1f} ms",
-            extra={"step": step},
-            exc_info=True,
+    def on_chain_start(
+        self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs: Any
+    ) -> Any:
+        logger.info(
+            "Graph Node/Chain Started",
+            extra={"extra_data": {"inputs": str(inputs)[:500]}},
         )
-        raise
-    else:
-        duration_ms = (time.perf_counter() - start) * 1000
-        logger.info(f"Exiting node after {duration_ms: .1f} ms", extra={"step": step})
 
+    def on_chain_end(self, outputs: Dict[str, Any], **kwargs: Any) -> Any:
+        logger.info(
+            "Graph Node/Chain Ended",
+            extra={"extra_data": {"outputs": str(outputs)[:500]}},
+        )
 
-# usage inside a node implementation:
-#####################################
+    def on_chain_error(
+        self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
+    ) -> Any:
+        logger.error(f"Graph Node/Chain Error: {error}", exc_info=True)
 
-# src/shipment_qna_bot/graph/nodes/retrieval_planner.py
+    def on_tool_start(
+        self, serialized: Dict[str, Any], input_str: str, **kwargs: Any
+    ) -> Any:
+        logger.info(
+            f"Tool Started: {serialized.get('name')}",
+            extra={"extra_data": {"input": input_str}},
+        )
 
-# from typing import Dict, Any
-# from shipment_qna_bot.logging.graph_tracing import log_node_execution
-# from shipment_qna_bot.logging.logger import logger
+    def on_tool_end(self, output: str, **kwargs: Any) -> Any:
+        logger.info("Tool Ended", extra={"extra_data": {"output": output[:500]}})
 
+    def on_tool_error(
+        self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
+    ) -> Any:
+        logger.error(f"Tool Error: {error}", exc_info=True)
 
-# def retrieval_planner_node(state: Dict[str, Any]) -> Dict[str, Any]:
-#     with log_node_execution("RetrievalPlanner", state):
-#         # ... your planner logic ...
-#         logger.debug(
-#             "Planner decided k=8 with strong container filter",
-#             extra={"step": "NODE:RetrievalPlanner"},
-#         )
-#         return state  # updated
+    def on_llm_start(
+        self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any
+    ) -> Any:
+        logger.info(
+            "LLM Started", extra={"extra_data": {"prompts": [p[:200] for p in prompts]}}
+        )
+
+    def on_llm_end(self, response: LLMResult, **kwargs: Any) -> Any:
+        logger.info(
+            "LLM Ended", extra={"extra_data": {"response": str(response)[:500]}}
+        )
+
+    def on_llm_error(
+        self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
+    ) -> Any:
+        logger.error(f"LLM Error: {error}", exc_info=True)

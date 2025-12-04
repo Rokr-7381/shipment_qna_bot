@@ -1,4 +1,6 @@
-The **full-scale, production-aligned folder structure** we should converge to for the project, with **what each folder/file is responsible for** and **how the flow moves end-to-end**. This structure supports:
+The **full-scale, production-aligned folder structure** we should converge to for the project, with **what each folder/file is responsible for** and **how the flow moves end-to-end**.
+
+This structure supports:
 
 * LangGraph orchestration (Corrective/Reflective later)
 * RLS/consignee scope (parent → children)
@@ -7,7 +9,6 @@ The **full-scale, production-aligned folder structure** we should converge to fo
 * Deterministic analytics (SQL/Pandas) + chart specs
 * FastAPI backend + Streamlit demo UI
 * ETL/indexing + eval harness + tests
-
 ---
 
 ## Canonical folder structure (target)
@@ -113,10 +114,9 @@ shipment_qna_bot/
    ├─ test_eta_logic.py
    └─ test_analytics_plans.py
 ```
-
 ---
 
-# What each major part does (in plain language)
+# What each major part does
 
 ## 1) `api/` — FastAPI entrypoint (the “product boundary”)
 
@@ -155,7 +155,7 @@ Each node does one job. No node should be “god node”.
 
 ---
 
-## 3) `security/` — RLS you can trust (no leaks)
+## 3) `security/` — RLS we can trust (no data leaks)
 
 * **scope.py**: implements parent-child hierarchy enforcement
 * **rls.py**: builds Azure Search filter strings *only from allowed scope*
@@ -188,13 +188,13 @@ Each node does one job. No node should be “god node”.
 
 ---
 
-## 6) `ui/streamlit_app.py` — demo UI (not production)
+## 6) `ui/streamlit_app.py` — demo UI (not production, latter we will bind it in .net frontend)
 
 * calls FastAPI `/api/chat`
 * shows answer + citations
 * renders charts/tables if present
 
-Later your .NET app will do the same: call the FastAPI service.
+Later .NET app will do the same: call the FastAPI service.
 
 ---
 
@@ -257,6 +257,12 @@ Later your .NET app will do the same: call the FastAPI service.
 * I add analytics and memory without polluting the graph logic.
 * It keeps on the critical path: **RLS + retrieval + deterministic answers**.
 
----
+# What gap it has
 
-If you want the next step, we should implement **memory/** first (store + memory_in/out nodes) because it touches minimal code and immediately improves UX without risking hallucination.
+* It does not have human-in-the-loop.
+* Time travel.
+* Duration window.
+* Durable execution.
+
+
+---
