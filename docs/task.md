@@ -1,21 +1,21 @@
 # Task Checklist
 
-- [ ] **Phase 0: Observability (Priority)**
-    - [ ] Implement `logging/logger.py` (Structured Logging) <!-- id: 16 -->
-    - [ ] Implement `logging/middleware.py` (Context Management) <!-- id: 17 -->
-    - [ ] Implement `logging/graph_tracing.py` (Graph Callbacks) <!-- id: 18 -->
+- [x] **Phase 0: Observability (Priority)**
+    - [x] Implement `logging/logger.py` (Structured Logging) <!-- id: 16 -->
+    - [x] Implement `logging/middleware.py` (Context Management) <!-- id: 17 -->
+    - [x] Implement `logging/graph_tracing.py` (Graph Callbacks) <!-- id: 18 -->
 
-- [ ] **Phase 1: Foundation & Security**
-    - [ ] Initialize project structure (folders, `__init__.py` files)
-    - [ ] Implement `security/scope.py` (Parent/Child logic) <!-- id: 0 -->
-    - [ ] Implement `security/rls.py` (Azure Filter Builder) <!-- id: 1 -->
-    - [ ] Verify RLS logic with unit tests <!-- id: 2 -->
+- [x] **Phase 1: Foundation & Security**
+    - [x] Initialize project structure (folders, `__init__.py` files)
+    - [x] Implement `security/scope.py` (Parent/Child logic) <!-- id: 0 -->
+    - [x] Implement `security/rls.py` (Azure Filter Builder) <!-- id: 1 -->
+    - [x] Verify RLS logic with unit tests <!-- id: 2 -->
 
-- [ ] **Phase 2: Core Graph & State**
-    - [ ] Define `graph/state.py` (GraphState) <!-- id: 3 -->
-    - [ ] Implement `graph/builder.py` with `MemorySaver` (In-Memory) <!-- id: 4 -->
-    - [ ] Implement `graph/nodes/normalizer.py` & `extractor.py` <!-- id: 5 -->
-    - [ ] Implement `graph/nodes/intent.py` & `router.py` <!-- id: 6 -->
+- [x] **Phase 2: Core Graph & State**
+    - [x] Define `graph/state.py` (GraphState) <!-- id: 3 -->
+    - [x] Implement `graph/builder.py` with `MemorySaver` (In-Memory) <!-- id: 4 -->
+    - [x] Implement `graph/nodes/normalizer.py` & `extractor.py` <!-- id: 5 -->
+    - [x] Implement `graph/nodes/intent.py` & `router.py` <!-- id: 6 -->
 
 - [ ] **Phase 3: Retrieval & Tools**
     - [ ] Implement `tools/azure_ai_search.py` (Hybrid Search + RLS) <!-- id: 7 -->
