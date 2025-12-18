@@ -71,7 +71,9 @@ This returns the effective `allowed_consignee_codes` used everywhere else.
 ### 2) `security/rls.py`
 Build filter strings for Azure AI Search:
 - always use `allowed_consignee_codes`
-- do not use raw payload codes
+- do not use raw payload codes directly in search tools
 
-Example if index field is collection `consignee_code_ids`:
+Implemented in:
+- `src/shipment_qna_bot/security/scope.py`
+- `src/shipment_qna_bot/security/rls.py`
 

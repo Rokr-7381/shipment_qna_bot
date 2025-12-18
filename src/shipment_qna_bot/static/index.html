@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,6 +10,7 @@
         :root {
             --bg-color: #1a1a1a;
             --chat-bg: #2d2d2d;
+            --sidebar-bg: #242424;
             --user-msg-bg: #007bff;
             --bot-msg-bg: #3d3d3d;
             --text-color: #ffffff;
@@ -28,21 +30,68 @@
 
         #app {
             width: 100%;
-            max-width: 800px;
+            max-width: 1200px;
             display: flex;
             flex-direction: column;
             background-color: var(--chat-bg);
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
         }
 
         header {
-            padding: 20px;
+            padding: 15px 20px;
             background-color: #242424;
             border-bottom: 1px solid var(--border-color);
             text-align: center;
         }
 
-        h1 { margin: 0; font-size: 1.2rem; }
+        h1 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+
+        #main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        #sidebar {
+            width: 250px;
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .sidebar-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .sidebar-section label {
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #aaa;
+        }
+
+        .sidebar-section input {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid var(--border-color);
+            background-color: var(--input-bg);
+            color: white;
+            font-size: 0.9rem;
+        }
+
+        #chat-window {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--chat-bg);
+        }
 
         #chat-container {
             flex: 1;
@@ -74,10 +123,26 @@
             border-bottom-left-radius: 5px;
         }
 
-        .message p { margin: 0 0 10px 0; }
-        .message p:last-child { margin: 0; }
-        .message code { background: rgba(0,0,0,0.2); padding: 2px 5px; border-radius: 3px; }
-        .message pre { background: rgba(0,0,0,0.2); padding: 10px; border-radius: 5px; overflow-x: auto; }
+        .message p {
+            margin: 0 0 10px 0;
+        }
+
+        .message p:last-child {
+            margin: 0;
+        }
+
+        .message code {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+
+        .message pre {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
 
         #input-area {
             padding: 20px;
@@ -87,7 +152,7 @@
             gap: 10px;
         }
 
-        input[type="text"] {
+        #user-input {
             flex: 1;
             padding: 12px;
             border-radius: 25px;
@@ -108,67 +173,101 @@
             transition: background 0.2s;
         }
 
-        button:hover { background-color: #0056b3; }
-        button:disabled { background-color: #555; cursor: not-allowed; }
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .typing {
             font-style: italic;
             color: #aaa;
             font-size: 0.9rem;
-            margin-left: 10px;
+            margin-bottom: 10px;
+            margin-left: 20px;
             display: none;
         }
     </style>
 </head>
+
 <body>
     <div id="app">
         <header>
             <h1>Shipment Q&A Bot 🚢</h1>
         </header>
-        
-        <div id="chat-container">
-            <div class="message bot">
-                Hello! I can help you track shipments and answer questions. Try asking about specific containers or analytics!
-            </div>
+
+        <div id="main-container">
+            <aside id="sidebar">
+                <div class="sidebar-section">
+                    <label for="consignee-input">Consignee Codes</label>
+                    <input type="text" id="consignee-input" placeholder="e.g. 0025833, 0000866" value="0025833">
+                    <small style="color: #888; font-size: 0.75rem;">Comma-separated values</small>
+                </div>
+                <div class="sidebar-section">
+                    <label>Session ID</label>
+                    <div id="session-display"
+                        style="font-family: monospace; font-size: 0.8rem; color: #888; overflow: hidden; text-overflow: ellipsis;">
+                    </div>
+                </div>
+            </aside>
+
+            <main id="chat-window">
+                <div id="chat-container">
+                    <div class="message bot">
+                        Hello! I can help you track shipments and answer questions. Try asking about specific containers
+                        or analytics!
+                    </div>
+                </div>
+
+                <div class="typing" id="typing-indicator">Typing...</div>
+
+                <form id="input-area">
+                    <input type="text" id="user-input" placeholder="Type your question..." autocomplete="off">
+                    <button type="submit" id="send-btn">Send</button>
+                </form>
+            </main>
         </div>
-
-        <div class="typing" id="typing-indicator">Typing...</div>
-
-        <form id="input-area">
-            <input type="text" id="user-input" placeholder="Type your question..." autocomplete="off">
-            <button type="submit" id="send-btn">Send</button>
-        </form>
     </div>
 
     <script>
         const form = document.getElementById('input-area');
         const input = document.getElementById('user-input');
+        const consigneeInput = document.getElementById('consignee-input');
         const chatContainer = document.getElementById('chat-container');
         const typingIndicator = document.getElementById('typing-indicator');
         const sendBtn = document.getElementById('send-btn');
+        const sessionDisplay = document.getElementById('session-display');
 
         // Simple conversation ID for demo (session storage)
         let conversationId = sessionStorage.getItem('convId') || 'web-' + Date.now();
         sessionStorage.setItem('convId', conversationId);
-
-        // Dummy consignee setup (in real app, this would be login-based)
-        const consigneeCodes = ["0025833"]; 
+        sessionDisplay.textContent = conversationId;
 
         function addMessage(text, role) {
             const div = document.createElement('div');
             div.className = `message ${role}`;
-            
+
             if (role === 'bot') {
                 div.innerHTML = marked.parse(text);
             } else {
                 div.textContent = text;
             }
-            
+
             chatContainer.appendChild(div);
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
@@ -178,6 +277,15 @@
             const text = input.value.trim();
             if (!text) return;
 
+            const consigneeValue = consigneeInput.value.trim();
+            if (!consigneeValue) {
+                alert("Please enter at least one consignee code in the sidebar.");
+                return;
+            }
+
+            // Split by comma and clean up
+            const codes = consigneeValue.split(',').map(s => s.trim()).filter(s => s !== '');
+
             // Add user message
             addMessage(text, 'user');
             input.value = '';
@@ -186,18 +294,18 @@
             typingIndicator.style.display = 'block';
 
             try {
-                const response = await fetch('/chat', {
+                const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        message: text,
+                        question: text,
                         conversation_id: conversationId,
-                        consignee_codes: consigneeCodes
+                        consignee_codes: codes
                     })
                 });
 
                 const data = await response.json();
-                
+
                 if (data.answer) {
                     addMessage(data.answer, 'bot');
                 } else {
@@ -218,4 +326,5 @@
         form.addEventListener('submit', sendMessage);
     </script>
 </body>
+
 </html>

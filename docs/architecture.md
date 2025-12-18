@@ -3,7 +3,7 @@
 ## Goal
 Provide a production-ready Shipment Q&A chatbot over a BYOD JSONL dataset using:
 - FastAPI backend
-- Streamlit demo UI
+- Vanilla CSS/JS Static UI (current) / Streamlit (experimental)
 - LangGraph orchestration (Corrective/Reflective RAG later)
 - Azure AI Search hybrid retrieval (BM25 + Vector)
 - Azure OpenAI embeddings + chat (chat later)

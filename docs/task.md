@@ -17,17 +17,18 @@
     - [x] Implement `graph/nodes/normalizer.py` & `extractor.py` <!-- id: 5 -->
     - [x] Implement `graph/nodes/intent.py` & `router.py` <!-- id: 6 -->
 
-- [ ] **Phase 3: Retrieval & Tools**
-    - [ ] Implement `tools/azure_ai_search.py` (Hybrid Search + RLS) <!-- id: 7 -->
-    - [ ] Implement `graph/nodes/planner.py` & `retrieve.py` <!-- id: 8 -->
-    - [ ] Implement `graph/nodes/handlers/` (Status, ETA, Delay) <!-- id: 9 -->
+- [x] **Phase 3: Retrieval & Tools**
+    - [x] Implement `tools/azure_ai_search.py` (Hybrid Search + RLS) <!-- id: 7 -->
+    - [x] Implement `graph/nodes/planner.py` & `retrieve.py` <!-- id: 8 -->
+    - [x] Implement `graph/nodes/handlers/` (Status, ETA, Delay) <!-- id: 9 -->
 
-- [ ] **Phase 4: API & Integration**
-    - [ ] Implement `api/routes/chat.py` (Endpoint) <!-- id: 10 -->
-    - [ ] Implement `api/main.py` (App entrypoint) <!-- id: 11 -->
-    - [ ] Connect Streamlit UI (`ui/streamlit_app.py`) <!-- id: 12 -->
+- [x] **Phase 4: API & Integration**
+    - [x] Implement `api/routes/chat.py` (Endpoint) <!-- id: 10 -->
+    - [x] Implement `api/main.py` (App entrypoint) <!-- id: 11 -->
+    - [x] Connect Basic Web UI (`static/index.html`) <!-- id: 12 -->
 
-- [ ] **Phase 5: Verification & Refinement**
+- [/] **Phase 5: Verification & Refinement**
+    - [x] Fix 404 and Logging issues <!-- id: 13.1 -->
     - [ ] Run end-to-end tests <!-- id: 13 -->
     - [ ] Address "Time Travel" data gap (Design decision needed) <!-- id: 14 -->
     - [ ] Address "Durable Execution" (Switch to Checkpointer?) <!-- id: 15 -->

@@ -3,6 +3,8 @@ import json
 import logging
 import sys
 from datetime import datetime, timezone
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 # Context variables for request tracing
@@ -52,6 +54,17 @@ def setup_logger(name: str = "shipment_qna_bot", level: str = "INFO") -> logging
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(JSONFormatter())
     logger.addHandler(handler)
+
+    # Add file handler for app.log
+    log_dir = Path(__file__).parent.parent / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "app.log"
+
+    file_handler = RotatingFileHandler(
+        log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+    )
+    file_handler.setFormatter(JSONFormatter())
+    logger.addHandler(file_handler)
 
     # Prevent propagation to root logger to avoid double logging if root is configured
     logger.propagate = False
