@@ -25,4 +25,4 @@ def intent_node(state: GraphState) -> GraphState:
         extra={"extra_data": {"text_snippet": text[:50]}},
     )
 
-    return {"primary_intent": intent}
+    return {"intent": intent}

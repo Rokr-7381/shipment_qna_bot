@@ -48,7 +48,7 @@ def answer_stub_node(state: Dict[str, Any]) -> Dict[str, Any]:
         evidences: List[Dict[str, Any]] = []
         for hit in hits[:5]:
             doc_id = hit.get("doc_id") or "-"
-            container = hit.get("container") or "-"
+            container = hit.get("container_number") or "-"
             score = hit.get("score")
             lines.append(f"- doc={doc_id} container={container} score={score}")
             evidences.append(

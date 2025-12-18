@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from shipment_qna_bot.graph.state import RetrievalPlan
-from shipment_qna_bot.logger.graph_tracing import log_node_execution
-from shipment_qna_bot.logger.logger import logger, set_log_context
+from shipment_qna_bot.logging.graph_tracing import log_node_execution
+from shipment_qna_bot.logging.logger import logger, set_log_context
 from shipment_qna_bot.tools.azure_ai_search import AzureAISearchTool
 from shipment_qna_bot.tools.azure_openai_embeddings import \
     AzureOpenAIEmbeddingsClient
@@ -37,7 +37,7 @@ def _get_embedder() -> AzureOpenAIEmbeddingsClient:
     return _EMBED
 
 
-def retrieve_node(state: Dict[str, Any], plan: RetrievalPlan) -> Dict[str, Any]:
+def retrieve_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Fetch docs from vectorDB for top k, filters, hybrid weights, etc.
     """
@@ -58,7 +58,7 @@ def retrieve_node(state: Dict[str, Any], plan: RetrievalPlan) -> Dict[str, Any]:
         query_text = (
             plan.get("query_text") or state.get("normalized_question") or ""
         ).strip()
-        extra_filters = (plan.get("extra_filters") or "").strip() or None
+        extra_filter = (plan.get("extra_filter") or "").strip() or None
 
         # fail closed on missing consigneescope
         if not consignee_codes:
@@ -81,16 +81,21 @@ def retrieve_node(state: Dict[str, Any], plan: RetrievalPlan) -> Dict[str, Any]:
 
         try:
             tool = _get_search()
-            hits = tool.search(
+            search_response = tool.search(
                 query_text=query_text or "*",
                 consignee_codes=consignee_codes,
                 top_k=int(plan.get("top_k", 8)),
                 vector=vector,
                 vector_k=int(plan.get("vector_k", 30)),
-                extra_filters=extra_filters,
-                hybrid_weights=plan.get("hybrid_weights") or {"bm": 0.6, "vector": 0.4},
+                extra_filter=extra_filter,
+                include_total_count=plan.get("include_total_count", False),
             )
+            hits = search_response["hits"]
             state["hits"] = hits
+            state["idx_analytics"] = {
+                "count": search_response.get("count"),
+                "facets": search_response.get("facets"),
+            }
             logger.info(
                 f"Retrieved {len(hits)} hits for query=<{query_text}>",
                 extra={"step": "NODE:Retriever"},
@@ -104,10 +109,5 @@ def retrieve_node(state: Dict[str, Any], plan: RetrievalPlan) -> Dict[str, Any]:
                 f"Search failed; falling back to keyword-only. err={e}",
                 extra={"step": "NODE:Retriever"},
             )
-
-        logger.info(
-            f"Planner decided k= <{state['top_k']}> hybrid weights=<{state['hybrid_weights']}>",
-            extra={"step", "NODE.RetrievalPlanner"},  # type: ignore
-        )
 
         return state

@@ -47,26 +47,18 @@ def planner_node(state: Dict[str, Any]) -> Dict[str, Any]:
             state.get("normalized_question") or state.get("question_raw") or ""
         ).strip()
 
-        containers = _ids_only(state.get("container_numbers"))
-        pos = _ids_only(state.get("po_numbers"))
-        obls = _ids_only(state.get("obl_numbers"))
-        bookings = _ids_only(state.get("booking_numbers"))
-
-        # Build a better-than-naive query text: prioritize identifiers if present.
-        # tokens = []
-        # if containers:
-        #     tokens.append(" ".join(containers))
-        # if obls:
-        #     tokens.append(" ".join(obls))
-        # if pos:
-        #     tokens.append(" ".join(pos))
-        # if bookings:
-        #     tokens.append(" ".join(bookings))
+        # Extract IDs from the dictionary populated by extractor_node
+        extracted = state.get("extracted_ids") or {}
+        containers = extracted.get("container") or []
+        pos = extracted.get("po") or []
+        obls = extracted.get("obl") or []
+        bookings = extracted.get("booking") or []
 
         # Build query text: prioritize identifiers if present
         id_tokens = [*containers, *obls, *pos, *bookings]
         query_text = " ".join(id_tokens).strip() or q
 
+        extra_filter = None
         plan: RetrievalPlan = {
             "query_text": query_text,
             "top_k": 5,

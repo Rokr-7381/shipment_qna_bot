@@ -63,3 +63,24 @@ class GraphTracingCallbackHandler(BaseCallbackHandler):
         self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
     ) -> Any:
         logger.error(f"LLM Error: {error}", exc_info=True)
+
+
+from contextlib import contextmanager
+from typing import Generator
+
+
+@contextmanager
+def log_node_execution(
+    node_name: str, context: Optional[Dict[str, Any]] = None
+) -> Generator[None, None, None]:
+    """
+    Context manager to log the start and end of a graph node execution.
+    """
+    context = context or {}
+    logger.info(f"Node execution started: {node_name}", extra={"extra_data": context})
+    try:
+        yield
+        logger.info(f"Node execution completed: {node_name}")
+    except Exception as e:
+        logger.error(f"Node execution failed: {node_name} - {e}", exc_info=True)
+        raise

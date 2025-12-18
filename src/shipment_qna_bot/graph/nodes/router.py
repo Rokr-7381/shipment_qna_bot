@@ -8,7 +8,7 @@ def route_node(state: GraphState) -> Literal["retrieval", "analytics", "end"]:
     """
     Decides the next path based on intent.
     """
-    intent = state.get("primary_intent")
+    intent = state.get("intent")
 
     if intent == "analytics":
         return "analytics"

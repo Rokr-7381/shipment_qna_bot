@@ -49,22 +49,17 @@ class AzureAISearchTool:
         # configured field names in az-index
         self._id_field = os.getenv("AZURE_SEARCH_ID_FIELD", "chunk_id")
         self._content_field = os.getenv("AZURE_SEARCH_CONTENT_FIELD", "chunk")
-        self._container_field = os.getenv(
-            "AZURE_SEARCH_CONTAINER_FIELD", "container_number"
-        )
+        self._container_field = os.getenv("AZURE_SEARCH_CONTAINER_FIELD", "metadata")
 
         # code-only field for consignee filter- RLS
         self._consignee_field = os.getenv(
             "AZURE_SEARCH_CONSIGNEE_FIELD", "consignee_codes"
         )
-        self._consignee_field_collection = os.getenv(
-            "AZURE_SEARCH_CONSIGNEE_FIELD", "consignee_codes"
+        self._consignee_is_collection = (
+            os.getenv("AZURE_SEARCH_CONSIGNEE_IS_COLLECTION", "true").lower() == "true"
         )
 
         # IMPORTANT: should be code-only, ideally a collection field in the index
-        self._consignee_field = os.getenv(
-            "AZURE_SEARCH_CONSIGNEE_FIELD", "consignee_codes"
-        )
 
         # vector field
         self._vector_field = os.getenv("AZURE_SEARCH_VECTOR_FIELD", "text_vector")
@@ -98,7 +93,9 @@ class AzureAISearchTool:
         vector: Optional[List[float]] = None,
         vector_k: int = 30,
         extra_filter: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        include_total_count: bool = False,
+        facets: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
         base_filter = self._consignee_filter(consignee_codes)
         final_filter = (
             base_filter if not extra_filter else f"({base_filter}) AND ({extra_filter})"
@@ -115,6 +112,8 @@ class AzureAISearchTool:
             "top": top_k,
             "filter": final_filter,
             "select": select,
+            "include_total_count": include_total_count,
+            "facets": facets,
         }
 
         if vector is not None and vector:
@@ -132,16 +131,43 @@ class AzureAISearchTool:
 
         results = self._client.search(**kwargs)
 
-        out: List[Dict[str, Any]] = []
+        hits: List[Dict[str, Any]] = []
         for r in results:
             doc = dict(r)
-            out.append(
+
+            # Extract container number
+            raw_container = doc.get(self._container_field)
+            container_number = raw_container
+            if isinstance(raw_container, dict) and "container_number" in raw_container:
+                container_number = raw_container["container_number"]
+
+            hits.append(
                 {
                     "doc_id": doc.get(self._id_field),
-                    "container_number": doc.get(self._container_field),
+                    "container_number": container_number,
                     "content": doc.get(self._content_field),
                     "score": doc.get("@search.score"),
                     "reranker_score": doc.get("@search.reranker_score"),
                 }
             )
-        return out
+
+        return {
+            "hits": hits,
+            "count": results.get_count() if include_total_count else None,
+            "facets": results.get_facets() if facets else None,
+        }
+
+    def upload_documents(self, documents: List[Dict[str, Any]]) -> None:
+        """
+        Uploads a batch of documents to the Azure Search index.
+        """
+        try:
+            results = self._client.upload_documents(documents=documents)
+            failed = [r for r in results if not r.succeeded]
+            if failed:
+                raise RuntimeError(
+                    f"Failed to upload {len(failed)} documents. "
+                    f"First error: {failed[0].error_message}"
+                )
+        except Exception as e:
+            raise RuntimeError(f"Error uploading documents: {str(e)}")

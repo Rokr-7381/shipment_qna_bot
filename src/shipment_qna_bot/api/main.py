@@ -3,7 +3,11 @@
 # call sign for running the app
 # uv run uvicorn shipment_qna_bot.api.main:app --reload --host=127.0.0.1 --port=8000
 #################
+import os
+
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from shipment_qna_bot.api.routes_chat import \
     router as chat_router  # type: ignore
@@ -13,6 +17,21 @@ app = FastAPI(title="MCS Shipment Chat Bot")
 
 # loging middleware (trace_id, timing, basic request logs)
 app.add_middleware(RequestLoggingMiddleware)
+
+# Mount static files
+static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+
+@app.get("/")
+async def read_root():
+    # Serve index.html if it exists
+    index_path = os.path.join(static_dir, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return {"message": "Shipment Q&A Bot API is running. Documentation at /docs"}
+
 
 # routers as chat_router as rote via user intention hook
 app.include_router(chat_router)

@@ -2,19 +2,29 @@ from operator import add
 from typing import Annotated, Any, Dict, List, Optional, TypedDict
 
 
+class RetrievalPlan(TypedDict):
+    query_text: str
+    top_k: int
+    vector_k: int
+    extra_filter: Optional[str]
+    include_total_count: Optional[bool]
+    reason: str
+    hybrid_weights: Optional[Dict[str, float]]
+
+
 class GraphState(TypedDict):
     """
     Represents the state of the conversation graph.
     """
 
     # --- Input ---
-    question: str
+    question_raw: str  # Original question
     normalized_question: Optional[str]
 
     # --- Context ---
     conversation_id: str
     trace_id: str
-    allowed_consignee_codes: List[str]
+    consignee_codes: List[str]  # aligned with nodes
 
     # --- Extraction ---
     # We use 'add' reducer to accumulate entities if multiple nodes find them (though usually just one extractor)
@@ -23,15 +33,16 @@ class GraphState(TypedDict):
     time_window_days: Optional[int]
 
     # --- Intent ---
-    primary_intent: Optional[str]
+    intent: Optional[str]
     sub_intents: List[str]
 
     # --- Retrieval ---
-    retrieval_plan: Optional[Dict[str, Any]]
-    retrieved_docs: List[Dict[str, Any]]
+    retrieval_plan: Optional[RetrievalPlan]
+    hits: List[Dict[str, Any]]  # aligned with nodes
+    idx_analytics: Optional[Dict[str, Any]]  # e.g. {count: 10, facets: ...}
 
     # --- Output ---
-    final_answer: Optional[str]
+    answer_text: Optional[str]  # aligned with nodes
     citations: List[Dict[str, Any]]
     chart_spec: Optional[Dict[str, Any]]
 

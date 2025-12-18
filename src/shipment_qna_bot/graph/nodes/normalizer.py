@@ -6,7 +6,7 @@ def normalize_node(state: GraphState) -> GraphState:
     """
     Normalizes the user's question.
     """
-    question = state.get("question", "").strip()
+    question = state.get("question_raw", "").strip()
     normalized = question.lower()
 
     logger.info(
