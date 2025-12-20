@@ -96,7 +96,7 @@ class AzureAISearchTool:
     ) -> Dict[str, Any]:
         base_filter = self._consignee_filter(consignee_codes)
         final_filter = (
-            base_filter if not extra_filter else f"({base_filter}) AND ({extra_filter})"
+            base_filter if not extra_filter else f"({base_filter}) and ({extra_filter})"
         )
         select = [
             self._id_field,

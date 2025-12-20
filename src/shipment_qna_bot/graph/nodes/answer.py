@@ -1,3 +1,4 @@
+import json
 from typing import Any, Dict
 
 from shipment_qna_bot.logging.graph_tracing import log_node_execution
@@ -50,15 +51,37 @@ def answer_node(state: Dict[str, Any]) -> Dict[str, Any]:
         if hits:
             for i, hit in enumerate(hits[:5]):
                 context_str += f"\n--- Document {i+1} ---\n"
-                # Sort keys to keep output predictable
-                for key in sorted(hit.keys()):
-                    val = hit[key]
-                    if val is not None and key not in [
-                        "score",
-                        "reranker_score",
-                        "doc_id",
-                    ]:
-                        context_str += f"{key}: {val}\n"
+
+                # Prioritize key fields
+                priority_fields = [
+                    "document_id",
+                    "container_number",
+                    "shipment_status",
+                    "po_numbers",
+                ]
+                for f in priority_fields:
+                    if f in hit:
+                        context_str += f"{f}: {hit[f]}\n"
+
+                # Add metadata_json content intelligently
+                if "metadata_json" in hit:
+                    try:
+                        m = json.loads(hit["metadata_json"])
+                        # Extract milestones if present
+                        if "milestones" in m:
+                            context_str += (
+                                f"Milestones: {json.dumps(m['milestones'])}\n"
+                            )
+                        # Add other relevant bits, avoiding huge chunks
+                        for k, v in m.items():
+                            if (
+                                k not in priority_fields
+                                and k != "milestones"
+                                and len(str(v)) < 200
+                            ):
+                                context_str += f"{k}: {v}\n"
+                    except:
+                        pass
 
         # If no info at all
         if not hits and not analytics:
@@ -70,24 +93,26 @@ def answer_node(state: Dict[str, Any]) -> Dict[str, Any]:
         # Prompt Construction
         system_prompt = """
 Role:
-You are an expert in Data Analysis AI/ML, specializing in using the pandas library for accurate, efficient, and insightful data exploration.
+You are an expert logistics analyst assistant. 
 
 Goal:
-Your primary function is to analyze retrieved shipment and logistics data to answer user questions, summarize findings, and extract key information without fabricating any data.
+Analyze the provided shipment data to answer user questions accurately.
 
-Context & Constraints:
-- Source of Truth: Use ONLY the data retrieved from Azure AI Search (shipment index). Do not use external web knowledge.
-- Data Integrity: Never invent or hallucinate data, columns, or records. If the required data is not present, say so explicitly.
-- Always give date when giving response in dd-mmm-yy format
-Result Limitation & Pagination:
-- When a query would result in more than 20 rows of raw record output, do NOT print them all.
-- Instead, summarize: e.g. "Found 145 shipments; average delay is 7 days", and include a placeholder tag [ACTION: SHOW_MORE] in your answer.
+Logistics Concepts:
+- Status vs Milestone: "Current Status" is often the 'shipment_status' field. "Last Milestone" is the final entry in the milestones list.
+- Hot PO/Container: Usually indicated by 'hot_container' boolean or a specific status tag.
+- ETA DP: Estimated Time of Arrival at Discharge Port.
+- ETA FD: Estimated Time of Arrival at Final Destination.
+
+Result Guidelines:
+- "Current Status with last milestone": Combine the top-level status with the most recent event description from the milestones list.
+- Date format: Use dd-mmm-yy (e.g., 20-Oct-25).
+- No Data: If the data exists but doesn't answer the specific question (e.g. "which carrier is handling it" but no carrier field exists), explain that the record was found but the specific detail is missing.
 
 Output Format:
 a. Direct Answer
-b. Summary & Methodology
-c. Data Preview (if applicable; 5–10 rows max)
-d. Pagination Signal [ACTION: SHOW_MORE] (if applicable)
+b. Summary & Methodology (Explain which identifiers or filters you found)
+c. Data Preview (max 5 rows)
 """.strip()
 
         user_prompt = (

@@ -1,37 +1,84 @@
 import re
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from shipment_qna_bot.graph.state import GraphState
 from shipment_qna_bot.logging.logger import logger
+from shipment_qna_bot.tools.azure_openai_chat import AzureOpenAIChatTool
+
+_CHAT_TOOL = None
 
 
-def extractor_node(state: GraphState) -> GraphState:
+def _get_chat_tool() -> AzureOpenAIChatTool:
+    global _CHAT_TOOL
+    if _CHAT_TOOL is None:
+        _CHAT_TOOL = AzureOpenAIChatTool()
+    return _CHAT_TOOL
+
+
+def extractor_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Extracts entities (Container, PO, OBL) from the normalized question.
+    Extracts entities (Container, PO, OBL, Booking, Dates, Locations) from the normalized question.
     """
-    text = state.get("normalized_question", "")
+    text = state.get("normalized_question") or state.get("question_raw") or ""
 
-    # Regex patterns (simplified for demo)
-    # Container: 4 letters + 7 digits (e.g., SEGU5935510)
+    # 1. Regex handles high-confidence ID extraction
     container_pattern = r"\b[a-zA-Z]{4}\d{7}\b"
-    # PO: 10 digits OR Prefix PO + digits
     po_pattern = r"\b(?:PO)?(\d{10})\b"
-    # OBL: Prefix OBL + alphanumeric (up to 20 chars)
-    obl_pattern = r"\b(?:OBL)?([a-zA-Z0-9]{5,20})\b"
+    # Booking numbers usually start with 2-3 letters + 7-10 digits, or just 10 digits
+    booking_pattern = r"\b(?:[a-zA-Z]{2,3})?\d{7,10}\b"
 
     containers = [c.upper() for c in re.findall(container_pattern, text)]
-    pos = [p.upper() for p in re.findall(po_pattern, text, re.IGNORECASE)]
-    obls = [o.upper() for o in re.findall(obl_pattern, text, re.IGNORECASE)]
+    pos = [p for p in re.findall(po_pattern, text, re.IGNORECASE)]
 
-    extracted = {
-        "container": containers,
-        "po": pos,
-        "obl": obls,
+    # 2. LLM handles ambiguous entities (Locations, Dates, Carriers, and validating regex results)
+    system_prompt = """
+    Extract logistics entities from the user's question. 
+    Return a JSON object with keys: 
+    - "container": list of container IDs (e.g. SEGU5935510)
+    - "po": list of PO numbers (10 digits)
+    - "booking": list of booking numbers (e.g. TH2017996)
+    - "obl": list of Ocean Bill of Lading numbers
+    - "location": list of cities or ports (e.g. "Los Angeles", "CNSHA")
+    - "carrier": list of shipping lines (e.g. "Maersk", "MSC")
+    - "date_range": e.g. "Oct", "November 25", "December"
+    - "status_keywords": e.g. "on water", "delivered", "delayed", "hot"
+
+    If nothing is found for a key, return an empty list.
+    """.strip()
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": text},
+    ]
+
+    llm_extracted = {}
+    try:
+        chat = _get_chat_tool()
+        import json
+
+        res = chat.chat_completion(messages, temperature=0.0)
+        # Find JSON block in response
+        json_match = re.search(r"\{.*\}", res, re.DOTALL)
+        if json_match:
+            llm_extracted = json.loads(json_match.group(0))
+    except Exception as e:
+        logger.warning(f"LLM Extraction failed: {e}. Falling back to regex.")
+
+    # Merge results
+    merged = {
+        "container": list(set(containers + (llm_extracted.get("container") or []))),
+        "po": list(set(pos + (llm_extracted.get("po") or []))),
+        "booking": llm_extracted.get("booking") or [],
+        "obl": llm_extracted.get("obl") or [],
+        "location": llm_extracted.get("location") or [],
+        "carrier": llm_extracted.get("carrier") or [],
+        "date_range": llm_extracted.get("date_range") or [],
+        "status_keywords": llm_extracted.get("status_keywords") or [],
     }
 
-    count = sum(len(v) for v in extracted.values())
+    count = sum(len(v) if isinstance(v, list) else 1 for v in merged.values() if v)
     logger.info(
-        f"Extracted {count} entities", extra={"extra_data": {"extracted": extracted}}
+        f"Extracted {count} entities", extra={"extra_data": {"extracted": merged}}
     )
 
-    return {"extracted_ids": extracted}
+    return {"extracted_ids": merged}

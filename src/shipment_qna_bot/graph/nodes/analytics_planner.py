@@ -31,7 +31,7 @@ def analytics_planner_node(state: Dict[str, Any]) -> Dict[str, Any]:
         plan: RetrievalPlan = {
             "query_text": "*",  # usually analytics over all or filtered set
             "top_k": 0,  # we care about aggregates, not individual hits usually
-            "vector_k": 0,
+            "vector_k": 10,
             "extra_filter": None,  # could add filter based on entities if needed
             "include_total_count": True,
             "reason": "analytics intent",

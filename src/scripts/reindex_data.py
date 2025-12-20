@@ -52,8 +52,19 @@ def flatten_document(
         if val is None:
             return []
         if isinstance(val, list):
-            return val
-        return [val]
+            # Flatten any nested lists and ensure all elements are strings
+            flat = []
+            for item in val:
+                if isinstance(item, str) and "," in item:
+                    flat.extend([s.strip() for s in item.split(",") if s.strip()])
+                else:
+                    flat.append(str(item))
+            return list(set(flat))
+        if isinstance(val, str):
+            if "," in val:
+                return [s.strip() for s in val.split(",") if s.strip()]
+            return [val.strip()]
+        return [str(val)]
 
     flattened = {
         "document_id": str(doc_id),

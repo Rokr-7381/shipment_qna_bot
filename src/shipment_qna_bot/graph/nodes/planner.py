@@ -1,78 +1,109 @@
-# src/shipment_qna_bot/graph/nodes/planner.py
-
-from __future__ import annotations
-
-from typing import Any, Dict, List, Tuple
+import json
+import re
+from typing import Any, Dict, List, Optional
 
 from shipment_qna_bot.graph.state import RetrievalPlan
 from shipment_qna_bot.logging.graph_tracing import log_node_execution
 from shipment_qna_bot.logging.logger import logger, set_log_context
+from shipment_qna_bot.tools.azure_openai_chat import AzureOpenAIChatTool
+
+_CHAT_TOOL = None
 
 
-def _ids_only(pairs: List[Tuple[str, float]] | None) -> List[str]:
-    if not pairs:
-        return []
-    return [p[0] for p in pairs if p and p[0]]
+def _get_chat_tool() -> AzureOpenAIChatTool:
+    global _CHAT_TOOL
+    if _CHAT_TOOL is None:
+        _CHAT_TOOL = AzureOpenAIChatTool()
+    return _CHAT_TOOL
 
 
-# find critix
-def _sync_ctx(state: Dict[str, Any]) -> None:
-    # set_log_context({"step": "NODE:Planner", "state": _summarize_state(state)})
+def planner_node(state: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Generates a RetrievalPlan (query text, top_k, filters) using LLM and extracted metadata.
+    """
     set_log_context(
         conversation_id=state.get("conversation_id", "-"),
         consignee_codes=state.get("consignee_codes", []),
         intent=state.get("intent", "-"),
     )
 
-
-def planner_node(state: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Produces:
-      state["retrieval_plan"] = {
-        query_text, top_k, vector_k, extra_filter, reason
-      }
-    """
-    _sync_ctx(state)
-
     with log_node_execution(
         "Planner",
         {
             "intent": state.get("intent", "-"),
-            "normalized_question": (state.get("normalized_question") or "-")[:120],
-            "time_window_days": state.get("time_window_days"),
+            "question": (state.get("normalized_question") or "-")[:120],
         },
     ):
-        intent = state.get("intent", "generic")
         q = (
             state.get("normalized_question") or state.get("question_raw") or ""
         ).strip()
-
-        # Extract IDs from the dictionary populated by extractor_node
         extracted = state.get("extracted_ids") or {}
-        containers = extracted.get("container") or []
-        pos = extracted.get("po") or []
-        obls = extracted.get("obl") or []
-        bookings = extracted.get("booking") or []
 
-        # Build query text: prioritize identifiers if present
-        id_tokens = [*containers, *obls, *pos, *bookings]
-        query_text = " ".join(id_tokens).strip() or q
+        # Logistics mapping and synonym dictionary for the LLM
+        logistics_context = """
+        Field Mappings in Index:
+        - container_number (String): e.g. SEGU5935510
+        - po_numbers (Collection): e.g. 5302997239
+        - booking_numbers (Collection): e.g. TH2017996
+        - ocean_bl_numbers (Collection)
+        - shipment_status (String): DELIVERED, IN_OCEAN, AT_DISCHARGE_PORT, READY_FOR_PICKUP, EMPTY_RETURNED
+        - hot_container (Boolean): True/False
+        - discharge_port_name (String): e.g. "Los Angeles"
+        - mother_vessel_name (String): e.g. "MAERSK SERANGOON"
 
-        extra_filter = None
+        Synonyms:
+        - "on water", "sailing" -> shipment_status eq 'IN_OCEAN'
+        - "hot" -> hot_container eq true
+    """.strip()
+
+        system_prompt = f"""
+        You are a Search Planner for a logistics bot. Given a user question and extracted entities, generate an Azure Search Plan.
+        
+        {logistics_context}
+
+        Output JSON only:
+        {{
+            "query_text": "text for hybrid search",
+            "extra_filter": "OData filter string or null",
+            "reason": "short explanation"
+        }}
+        """
+
+        user_content = f"Question: {q}\nExtracted Entities: {json.dumps(extracted)}"
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ]
+
+        plan_data = {}
+        try:
+            chat = _get_chat_tool()
+            res = chat.chat_completion(messages, temperature=0.0)
+            json_match = re.search(r"\{.*\}", res, re.DOTALL)
+            if json_match:
+                plan_data = json.loads(json_match.group(0))
+        except Exception as e:
+            logger.warning(f"Planning LLM failed: {e}")
+
+        # Construct final plan
         plan: RetrievalPlan = {
-            "query_text": query_text,
-            "top_k": 5,
+            "query_text": plan_data.get("query_text") or q,
+            "top_k": 8,
             "vector_k": 30,
-            "extra_filter": extra_filter,
-            "reason": f"intent={intent}; ids={bool(id_tokens)}",
+            "extra_filter": plan_data.get("extra_filter"),
+            "reason": plan_data.get("reason", "fallback"),
         }
 
-        state["retrieval_plan"] = plan
+        # Booster: if we have specific IDs, make sure they are in query_text
+        all_ids = []
+        for k in ["container", "po", "booking", "obl"]:
+            all_ids.extend(extracted.get(k) or [])
 
-        logger.info(
-            f"Planned retrieval: query_text='{query_text[:80]}' top_k={plan['top_k']} vector_k={plan['vector_k']} "
-            f"extra_filter={'yes' if extra_filter else 'no'} reason={plan['reason']}",
-            extra={"step": "NODE:Planner"},
-        )
+        if all_ids:
+            plan["query_text"] = " ".join(list(set(all_ids))) + " " + plan["query_text"]
+
+        state["retrieval_plan"] = plan
+        logger.info(f"Planned retrieval: {plan}")
 
         return state
