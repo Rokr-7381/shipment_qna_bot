@@ -27,7 +27,7 @@ to avoid nested field filter limitations.
 - `content` (Edm.String, searchable = true)
 
 ### 2) Vector Field (for hybrid)
-- `content_vector` (Collection(Edm.Single)) dimensions = embedding dims
+- `content_vector` (Collection(Edm.Single)) dimensions = embedding dims => 1536
   - searchable vector field
 
 ### 3) RLS Field (CRITICAL)
@@ -42,13 +42,13 @@ These are used for lookup and/or query planning:
 - `booking_numbers` (Collection(Edm.String), searchable = true, filterable optional)
 
 > Important: multi-value fields should be arrays in index, not comma-strings.
-If source is comma-string, split during ingestion.
+Since source is comma-string, will split during ingestion.
 
 ### 5) Date/Status Fields (for deterministic handlers)
 Use `Edm.DateTimeOffset` for proper filtering (recommended).
-If you cannot, keep as `Edm.String` but deterministic date filtering becomes harder.
+If we cannot, keep as `Edm.String` but deterministic date filtering becomes harder.
 
-Recommended:
+Recommended & Current schema applied:
 - `eta_dp_date` (Edm.DateTimeOffset, filterable = true, sortable = true)
 - `eta_fd_date` (Edm.DateTimeOffset, filterable = true, sortable = true)
 - `ata_dp_date` (Edm.DateTimeOffset, filterable = true, sortable = true)

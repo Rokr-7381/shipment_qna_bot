@@ -6,11 +6,23 @@ from shipment_qna_bot.graph.nodes.analytics_planner import \
 from shipment_qna_bot.graph.nodes.answer import answer_node
 from shipment_qna_bot.graph.nodes.extractor import extractor_node
 from shipment_qna_bot.graph.nodes.intent import intent_node
+from shipment_qna_bot.graph.nodes.judge import judge_node
 from shipment_qna_bot.graph.nodes.normalizer import normalize_node
 from shipment_qna_bot.graph.nodes.planner import planner_node
 from shipment_qna_bot.graph.nodes.retrieve import retrieve_node
 from shipment_qna_bot.graph.nodes.router import route_node
 from shipment_qna_bot.graph.state import GraphState
+
+
+def should_continue(state: GraphState):
+    """
+    Conditional edge to determine if we should retry retrieval or finish.
+    """
+    if state.get("is_satisfied"):
+        return "end"
+    if state.get("retry_count", 0) >= state.get("max_retries", 3):
+        return "end"
+    return "retry"
 
 
 def build_graph():
@@ -27,6 +39,7 @@ def build_graph():
     workflow.add_node("analytics_planner", analytics_planner_node)
     workflow.add_node("retrieve", retrieve_node)
     workflow.add_node("answer", answer_node)
+    workflow.add_node("judge", judge_node)
 
     # --- Add Edges ---
     # Start -> Normalizer
@@ -53,7 +66,17 @@ def build_graph():
     workflow.add_edge("planner", "retrieve")
     workflow.add_edge("analytics_planner", "retrieve")
     workflow.add_edge("retrieve", "answer")
-    workflow.add_edge("answer", END)
+    workflow.add_edge("answer", "judge")
+
+    # Reflective Loop
+    workflow.add_conditional_edges(
+        "judge",
+        should_continue,
+        {
+            "retry": "planner",
+            "end": END,
+        },
+    )
 
     # --- Checkpointer ---
     # Using MemorySaver for in-memory durable execution (Session scope)
@@ -73,10 +96,19 @@ def run_graph(input_state: dict) -> dict:
     thread_id = input_state.get("conversation_id", "default")
     config = {"configurable": {"thread_id": thread_id}}
 
+    # Initialize control flow fields if not present
+    if "retry_count" not in input_state:
+        input_state["retry_count"] = 0
+    if "max_retries" not in input_state:
+        input_state["max_retries"] = 3
+    if "is_satisfied" not in input_state:
+        input_state["is_satisfied"] = False
+
     # Convert question_raw to a message for history persistence
     from langchain_core.messages import HumanMessage
 
-    if "messages" not in input_state:
-        input_state["messages"] = [HumanMessage(content=input_state["question_raw"])]
+    # We always append the current question to the message history if it's a new turn.
+    # In LangGraph, if we use add_messages, we just provide the new message.
+    input_state["messages"] = [HumanMessage(content=input_state["question_raw"])]
 
     return graph_app.invoke(input_state, config=config)

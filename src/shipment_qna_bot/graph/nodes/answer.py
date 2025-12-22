@@ -119,15 +119,25 @@ c. Data Preview (max 5 rows)
             f"Context:\n{context_str}\n\n" f"Question: {question}\n\n" "Answer:"
         )
 
-        from langchain_core.messages import AIMessage
+        from langchain_core.messages import AIMessage, HumanMessage
 
         # Build message history for OpenAI
-        # We start with system prompt, then add previous messages, then current user prompt
         llm_messages = [{"role": "system", "content": system_prompt}]
 
-        # Add history (excluding the very last one which we'll replace with user_prompt)
+        # Add history
+        # We want to include previous turns, but correctly handle the current turn's context
         history = state.get("messages") or []
-        for msg in history[:-1]:
+
+        # If this is a retry, the last message in history is the previous (unsatisfactory) AIMessage
+        # The one before it is the current HumanMessage
+
+        current_question_found = False
+        for msg in history:
+            if isinstance(msg, HumanMessage) and msg.content == question:
+                # This is the current question, we'll add it later with context
+                current_question_found = True
+                continue
+
             role = "user" if msg.type == "human" else "assistant"
             llm_messages.append({"role": role, "content": msg.content})
 
@@ -137,9 +147,15 @@ c. Data Preview (max 5 rows)
         try:
             chat_tool = _get_chat_tool()
             response_text = chat_tool.chat_completion(llm_messages)
+
+            if not response_text or response_text.strip() == "":
+                response_text = "I processed the data but couldn't generate a summary. Please try rephrasing your question."
+
             state["answer_text"] = response_text
 
-            # Append AI response to messages for next turn
+            # In LangGraph with add_messages, we return the NEW message to be appended.
+            # If we already have history, we might want to avoid bloating it with failed attempts?
+            # For now, just append the new one.
             state["messages"] = [AIMessage(content=response_text)]
 
             logger.info(

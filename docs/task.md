@@ -30,5 +30,5 @@
 - [/] **Phase 5: Verification & Refinement**
     - [x] Fix 404 and Logging issues <!-- id: 13.1 -->
     - [ ] Run end-to-end tests <!-- id: 13 -->
-    - [ ] Address "Time Travel" data gap (Design decision needed) <!-- id: 14 -->
+    - [ ] Address "Time Travel" data gap (Design decision needed) <!-- id: 14 --> Already identified and discussed with AmitDa about certain fields (atd_lp, flp related dates, etc...)
     - [ ] Address "Durable Execution" (Switch to Checkpointer?) <!-- id: 15 -->

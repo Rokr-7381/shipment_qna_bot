@@ -1,7 +1,7 @@
 
 ---
 
-## ✅ `docs/rls_model.md`
+## `docs/rls_model.md`
 
 ```markdown
 # RLS (Row-Level Security) Model — Consignee Scope
@@ -42,7 +42,7 @@ For demo:
 ### Rule 1 — Fail Closed
 If no consignee scope resolved:
 - deny retrieval (no hits)
-- respond with: "Not authorized"
+- respond with: "No Data fiund in your dataset"
 
 ### Rule 2 — Parent Can See Children
 If user is authenticated as parent `P`:

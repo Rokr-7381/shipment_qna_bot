@@ -70,7 +70,7 @@ def normalize_document(doc: Dict[str, Any]) -> Dict[str, Any]:
     # Construct new doc matching expected schema
     # We default target fields to what the tool expects by default
     # But usually we map to what the INDEX has.
-    # Assuming index has: chunk_id, chunk, container_number, consignee_codes
+    # Index has: chunk_id, chunk, container_number, consignee_codes
 
     # Construct new doc matching expected schema using inspected keys
     # Index fields: chunk_id, chunk, document_id, metadata, consignee_code, etc.

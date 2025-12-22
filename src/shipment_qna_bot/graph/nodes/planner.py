@@ -69,7 +69,13 @@ def planner_node(state: Dict[str, Any]) -> Dict[str, Any]:
         }}
         """
 
+        reflection_feedback = state.get("reflection_feedback")
+        retry_count = state.get("retry_count", 0)
+
         user_content = f"Question: {q}\nExtracted Entities: {json.dumps(extracted)}"
+
+        if reflection_feedback and retry_count > 0:
+            user_content += f"\n\n--- PREVIOUS ATTEMPT FEEDBACK ---\nThe previous retrieval did not result in a satisfactory answer. \nFeedback from judge: {reflection_feedback}\nPlease refine the search plan to better address the user's question."
 
         messages = [
             {"role": "system", "content": system_prompt},

@@ -50,6 +50,12 @@ class GraphState(TypedDict):
     citations: List[Dict[str, Any]]
     chart_spec: Optional[Dict[str, Any]]
 
+    # --- Control Flow ---
+    retry_count: int
+    max_retries: int
+    is_satisfied: bool
+    reflection_feedback: Optional[str]
+
     # --- Errors/Notices ---
     errors: Annotated[List[str], add]
     notices: Annotated[List[str], add]

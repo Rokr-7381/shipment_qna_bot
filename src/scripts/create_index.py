@@ -42,7 +42,7 @@ def create_index():
             name="content_vector",
             type=SearchFieldDataType.Collection(SearchFieldDataType.Single),
             searchable=True,
-            vector_search_dimensions=1536,  # Default for text-embedding-3-small
+            vector_search_dimensions=1536,  # Default for text-embedding-ada-002 and text-embedding-3-small
             vector_search_profile_name="my-vector-profile",
         ),
         # RLS Field: Critical for filtering
