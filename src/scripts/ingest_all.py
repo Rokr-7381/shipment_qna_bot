@@ -8,6 +8,7 @@ import os
 import shutil
 import sys
 import time
+from datetime import timedelta
 
 # Ensure src is in python path
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -106,7 +107,7 @@ def ingest_all():
     end_time = time.perf_counter()
     delta = end_time - start_time
 
-    print(f"Total time taken: {timedelta(seconds=round(delta))}")
+    print(f"Total time taken: {timedelta(seconds=delta)}")
     print("\n--- All ingestions complete! ---")
 
 

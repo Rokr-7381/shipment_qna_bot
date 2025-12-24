@@ -45,7 +45,7 @@ def planner_node(state: Dict[str, Any]) -> Dict[str, Any]:
         - container_number (String): e.g. SEGU5935510
         - po_numbers (Collection): e.g. 5302997239
         - booking_numbers (Collection): e.g. TH2017996
-        - ocean_bl_numbers (Collection)
+        - obl_nos (Collection)
         - shipment_status (String): DELIVERED, IN_OCEAN, AT_DISCHARGE_PORT, READY_FOR_PICKUP, EMPTY_RETURNED
         - hot_container (Boolean): True/False
         - discharge_port_name (String): e.g. "Los Angeles"

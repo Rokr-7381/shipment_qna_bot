@@ -40,6 +40,8 @@ def _get_embedder() -> AzureOpenAIEmbeddingsClient:
 def retrieve_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Fetch docs from vectorDB for top k, filters, hybrid weights, etc.
+    This node assumes `state['consignee_codes']` is already an *effective*,
+    authorized scope. It must NEVER receive raw payload values.
     """
     _sync_ctx(state)
 

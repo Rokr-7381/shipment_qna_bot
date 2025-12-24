@@ -14,6 +14,8 @@ from azure.core.credentials import AzureKeyCredential
 from azure.identity import DefaultAzureCredential
 from azure.search.documents import SearchClient
 
+from shipment_qna_bot.security.rls import build_search_filter
+
 # from openai import AzureOpenAI
 
 try:
@@ -72,11 +74,22 @@ class AzureAISearchTool:
             return "false"
 
         joined = ",".join([c.strip() for c in codes if c and c.strip()])
+        if not joined:
+            return "false"
 
         # Collection field:
         # consignee_code_ids/any(c: search.in(c, '0000866,234567', ','))
         if self._consignee_is_collection:
-            return f"{self._consignee_field}/any(c: search.in(c, '{joined}', ','))"
+            # return f"{self._consignee_field}/any(c: search.in(c, '{joined}', ','))"
+            return build_search_filter(
+                allowed_codes=joined, field_name=self._consignee_field
+            )
+
+        # Legacy: plain string field (e.g., `consignee_codes` as a single string)
+        # Escaping single quotes to keep OData happy
+        safe_codes = [c.replace("'", "''") for c in joined]
+        joined = ",".join(safe_codes)
+        return f" Search.in ({self._consignee_field}, '{joined})', ',')"
 
         # Plain string field:
         # search.in(consignee_codes, '0000866,234567', ',')
@@ -94,6 +107,14 @@ class AzureAISearchTool:
         include_total_count: bool = False,
         facets: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
+        """
+        Hybrid search entry point.
+
+        NOTE:
+        - `consignee_codes` MUST be the already-authorized scope (effective scope).
+          Never pass raw payload values here. The API layer is responsible for using
+          `resolve_allowed_scope` and only forwarding the allowed list.
+        """
         base_filter = self._consignee_filter(consignee_codes)
         final_filter = (
             base_filter if not extra_filter else f"({base_filter}) and ({extra_filter})"
