@@ -49,7 +49,7 @@ def answer_node(state: Dict[str, Any]) -> Dict[str, Any]:
 
         # 2. Add Documents Context
         if hits:
-            for i, hit in enumerate(hits[:5]):
+            for i, hit in enumerate(hits[:10]):
                 context_str += f"\n--- Document {i+1} ---\n"
 
                 # Prioritize key fields
@@ -109,20 +109,37 @@ Goal:
 Analyze the provided shipment data to answer user questions accurately.
 
 Logistics Concepts:
-- Status vs Milestone: "Current Status" is often the 'shipment_status' field. "Last Milestone" is the final entry in the milestones list.
-- Hot PO/Container: Usually indicated by 'hot_container_flag' boolean or a specific status tag.
+- Status vs Milestone: "Current Status" is often the 'shipment_status' field.
+- Hot PO/Container: Indicated by 'hot_container_flag' being true.
 - ETA DP: Estimated Time of Arrival at Discharge Port.
-- ETA FD: Estimated Time of Arrival at Final Destination.
+- ATA DP: Actual Time of Arrival at Discharge Port (use 'ata_dp_date' field).
+- ETA FD: Estimated Time of Arrival at Final Destination (use 'eta_fd_date' field).
 
 Result Guidelines:
-- "Current Status with last milestone": Combine the top-level status with the most recent event description from the milestones list.
-- Date format: Use dd-mmm-yy (e.g., 20-Oct-25).
-- No Data: If the data exists but doesn't answer the specific question (e.g. "which carrier is handling it" but no carrier field exists), explain that the record was found but the specific detail is missing.
+1. DATA PRESENTATION (STRICT):
+   - If multiple shipments are found, ALWAYS present them in a Markdown Table.
+   - TABLE COLUMNS: | Container | PO Numbers | Discharge Port | Arrival Date (ETA/ATA) |
+   - ARRIVAL DATE: Use 'ata_dp_date' if the shipment has arrived, otherwise 'eta_dp_date'. Use 'dd-mmm-yy' format.
+   - DATE FORMAT: Use dd-mmm-yy (e.g., 20-Oct-25).
+   - SORTING: The data is provided in descending order of arrival. Maintain this order.
+   - HIDE: Do not show 'document_id' in any part of the answer.
+
+2. GROUNDING (CRITICAL):
+   - Use ONLY the provided context to answer. 
+   - DO NOT include containers, POs, or details NOT present in the context.
+   - If the user asks for more than what is visible, refer them to the total match count or suggest clicking "Show more".
+   - DO NOT speculate or hallucinate.
+
+3. SUMMARY:
+   - Provide a brief summary of how many hot containers were found and any specific filters applied (e.g., "3 days", "Rotterdam").
+
+4. PAGINATION:
+   - If there are more results, include the hint: {pagination_hint}
 
 Output Format:
-a. Direct Answer
-b. Summary & Methodology (Explain which identifiers or filters you found)
-c. Data Preview (max 10 rows)
+a. Direct Answer / Summary
+b. Data Table
+c. Pagination Button (if applicable)
 """.strip()
 
         user_prompt = (

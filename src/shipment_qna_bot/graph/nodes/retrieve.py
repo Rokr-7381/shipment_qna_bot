@@ -143,8 +143,11 @@ def retrieve_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 f"Search failed: {type(e).__name__}: {e}"
             )
             state["hits"] = []
+            state.setdefault("notices", []).append(
+                f"Note: Search encountered a temporary issue ({type(e).__name__}). Some data might be missing."
+            )
             logger.exception(
-                f"Search failed; falling back to keyword-only. err={e}",
+                f"Search failed completely. err={e}",
                 extra={"step": "NODE:Retriever"},
             )
 
