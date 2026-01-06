@@ -14,7 +14,7 @@ def inspect_live_data():
     endpoint = os.getenv("AZURE_SEARCH_ENDPOINT")
     api_key = os.getenv("AZURE_SEARCH_API_KEY")
     # Force check of the indexer target
-    index_name = os.getenv("AZURE_SEARCH_INDEX_NAME", "shipment-jsonl-idx")
+    index_name = os.getenv("AZURE_SEARCH_INDEX_NAME", "shipment-idx")
 
     if not endpoint or not index_name:
         print("Missing env vars")

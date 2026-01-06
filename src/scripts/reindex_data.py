@@ -2,7 +2,9 @@
 
 import json
 import os
+import re
 import sys
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 # Ensure src is in python path
@@ -34,6 +36,11 @@ def flatten_document(
     content = doc.get("content", "")
     doc_id = doc.get("document_id")
 
+    if not doc_id or not content or not isinstance(metadata, dict):
+        raise ValueError(
+            "Invalid JSONL schema. Require document_id, content, and metadata dict."
+        )
+
     # Consignee codes (RLS)
     consignee_codes = metadata.get("consignee_codes", [])
     if not consignee_codes:
@@ -43,6 +50,8 @@ def flatten_document(
                 consignee_codes = json.loads(raw.replace("'", '"'))
             except:
                 consignee_codes = [raw]
+    if not consignee_codes:
+        raise ValueError("Missing consignee_codes for RLS.")
 
     # Geenerate embedding
     print(f"Generating embedding for doc {doc_id}...")
@@ -66,6 +75,50 @@ def flatten_document(
             return [val.strip()]
         return [str(val)]
 
+    def _meta(key: str) -> Any:
+        return metadata.get(key)
+
+    def _normalize_dt(val: Any) -> Any:
+        if val is None:
+            return None
+        try:
+            if str(val).strip().lower() in {"nat", "nan", "none", ""}:
+                return None
+        except Exception:
+            pass
+        if isinstance(val, str):
+            s = val.strip()
+            if not s:
+                return None
+            if s.lower() in {"nat", "nan", "none"}:
+                return None
+            if s.endswith("Z") or re.search(r"[+-]\d\d:\d\d$", s):
+                return s
+            try:
+                dt = datetime.fromisoformat(s)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt.isoformat()
+            except Exception:
+                if re.match(r"^\d{4}-\d{2}-\d{2}$", s):
+                    return s + "T00:00:00Z"
+                if re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$", s):
+                    return s + "Z"
+                return s
+        return val
+
+    ata_dp_date = (
+        _meta("optimal_ata_dp_date")
+        or _meta("ata_dp_date")
+        or _meta("derived_ata_dp_date")
+    )
+    eta_fd_date = _meta("optimal_eta_fd_date") or _meta("eta_fd_date")
+    revised_eta = (
+        _meta("revised_eta")
+        or _meta("revised_eta_date")
+        or _meta("revised_eta_fd_date")
+    )
+
     flattened = {
         "document_id": str(doc_id),
         "content": content,
@@ -73,11 +126,42 @@ def flatten_document(
         "consignee_code_ids": to_list(consignee_codes),
         "container_number": metadata.get("container_number"),
         "po_numbers": to_list(metadata.get("po_numbers", [])),
-        "obl_nos": to_list(metadata.get("ocean_bl_numbers", [])),
+        "obl_nos": to_list(
+            metadata.get("obl_nos", metadata.get("ocean_bl_numbers", []))
+        ),
         "booking_numbers": to_list(metadata.get("booking_numbers", [])),
         "hot_container_flag": bool(
             metadata.get("hot_container", metadata.get("hot_container_flag", False))
         ),
+        "container_type": _meta("container_type"),
+        "destination_service": _meta("destination_service"),
+        "load_port": _meta("load_port"),
+        "final_load_port": _meta("final_load_port"),
+        "discharge_port": _meta("discharge_port"),
+        "last_cy_location": _meta("last_cy_location"),
+        "place_of_receipt": _meta("place_of_receipt"),
+        "place_of_delivery": _meta("place_of_delivery"),
+        "final_destination": _meta("final_destination"),
+        "first_vessel_name": _meta("first_vessel_name"),
+        "final_carrier_name": _meta("final_carrier_name"),
+        "final_vessel_name": _meta("final_vessel_name"),
+        "shipment_status": _meta("shipment_status"),
+        "true_carrier_scac_name": _meta("true_carrier_scac_name"),
+        "etd_lp_date": _normalize_dt(_meta("etd_lp_date")),
+        "etd_flp_date": _normalize_dt(_meta("etd_flp_date")),
+        "eta_dp_date": _normalize_dt(_meta("eta_dp_date")),
+        "eta_fd_date": _normalize_dt(eta_fd_date),
+        "revised_eta": _normalize_dt(revised_eta),
+        "atd_lp_date": _normalize_dt(_meta("atd_lp_date")),
+        "ata_flp_date": _normalize_dt(_meta("ata_flp_date")),
+        "atd_flp_date": _normalize_dt(_meta("atd_flp_date")),
+        "ata_dp_date": _normalize_dt(ata_dp_date),
+        "supplier_vendor_name": _meta("supplier_vendor_name"),
+        "manufacturer_name": _meta("manufacturer_name"),
+        "ship_to_party_name": _meta("ship_to_party_name"),
+        "job_type": _meta("job_type"),
+        "mcs_hbl": _meta("mcs_hbl"),
+        "transport_mode": _meta("transport_mode"),
         # Metadata JSON blob
         "metadata_json": json.dumps(metadata),
     }

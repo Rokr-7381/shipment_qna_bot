@@ -124,7 +124,6 @@ class AzureAISearchTool:
             self._id_field,
             self._content_field,
             self._container_field,
-            self._consignee_field,
         ]
 
         kwargs: Dict[str, Any] = {
@@ -180,7 +179,10 @@ class AzureAISearchTool:
             }
             # Include all other fields except vectors to avoid bloat
             for k, v in doc.items():
-                if k not in hit and k != self._vector_field:
+                if k not in hit and k not in {
+                    self._vector_field,
+                    self._consignee_field,
+                }:
                     hit[k] = v
 
             hits.append(hit)

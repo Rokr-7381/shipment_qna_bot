@@ -80,6 +80,91 @@ def create_index():
             searchable=True,
             filterable=True,
         ),
+        # User-filterable shipment attributes
+        SearchField(
+            name="container_type",
+            type=SearchFieldDataType.String,
+            searchable=True,
+            filterable=True,
+        ),
+        SearchField(
+            name="destination_service",
+            type=SearchFieldDataType.String,
+            searchable=True,
+            filterable=True,
+        ),
+        SearchField(
+            name="load_port",
+            type=SearchFieldDataType.String,
+            searchable=True,
+            filterable=True,
+        ),
+        SearchField(
+            name="final_load_port",
+            type=SearchFieldDataType.String,
+            searchable=True,
+            filterable=True,
+        ),
+        SearchField(
+            name="discharge_port",
+            type=SearchFieldDataType.String,
+            searchable=True,
+            filterable=True,
+        ),
+        SearchField(
+            name="last_cy_location",
+            type=SearchFieldDataType.String,
+            searchable=True,
+            filterable=True,
+        ),
+        SearchField(
+            name="place_of_receipt",
+            type=SearchFieldDataType.String,
+            searchable=True,
+            filterable=True,
+        ),
+        SearchField(
+            name="place_of_delivery",
+            type=SearchFieldDataType.String,
+            searchable=True,
+            filterable=True,
+        ),
+        SearchField(
+            name="final_destination",
+            type=SearchFieldDataType.String,
+            searchable=True,
+            filterable=True,
+        ),
+        SearchField(
+            name="first_vessel_name",
+            type=SearchFieldDataType.String,
+            searchable=True,
+            filterable=True,
+        ),
+        SearchField(
+            name="final_carrier_name",
+            type=SearchFieldDataType.String,
+            searchable=True,
+            filterable=True,
+        ),
+        SearchField(
+            name="final_vessel_name",
+            type=SearchFieldDataType.String,
+            searchable=True,
+            filterable=True,
+        ),
+        SearchField(
+            name="shipment_status",
+            type=SearchFieldDataType.String,
+            searchable=True,
+            filterable=True,
+        ),
+        SearchField(
+            name="true_carrier_scac_name",
+            type=SearchFieldDataType.String,
+            searchable=True,
+            filterable=True,
+        ),
         SimpleField(
             name="hot_container_flag",
             type=SearchFieldDataType.Boolean,
@@ -87,6 +172,18 @@ def create_index():
             sortable=True,
         ),
         # Date Fields
+        SearchField(
+            name="etd_lp_date",
+            type=SearchFieldDataType.DateTimeOffset,
+            filterable=True,
+            sortable=True,
+        ),
+        SearchField(
+            name="etd_flp_date",
+            type=SearchFieldDataType.DateTimeOffset,
+            filterable=True,
+            sortable=True,
+        ),
         SearchField(
             name="eta_dp_date",
             type=SearchFieldDataType.DateTimeOffset,
@@ -98,6 +195,72 @@ def create_index():
             type=SearchFieldDataType.DateTimeOffset,
             filterable=True,
             sortable=True,
+        ),
+        SearchField(
+            name="revised_eta",
+            type=SearchFieldDataType.DateTimeOffset,
+            filterable=True,
+            sortable=True,
+        ),
+        SearchField(
+            name="atd_lp_date",
+            type=SearchFieldDataType.DateTimeOffset,
+            filterable=True,
+            sortable=True,
+        ),
+        SearchField(
+            name="ata_flp_date",
+            type=SearchFieldDataType.DateTimeOffset,
+            filterable=True,
+            sortable=True,
+        ),
+        SearchField(
+            name="atd_flp_date",
+            type=SearchFieldDataType.DateTimeOffset,
+            filterable=True,
+            sortable=True,
+        ),
+        SearchField(
+            name="ata_dp_date",
+            type=SearchFieldDataType.DateTimeOffset,
+            filterable=True,
+            sortable=True,
+        ),
+        SearchField(
+            name="supplier_vendor_name",
+            type=SearchFieldDataType.String,
+            searchable=True,
+            filterable=True,
+        ),
+        SearchField(
+            name="manufacturer_name",
+            type=SearchFieldDataType.String,
+            searchable=True,
+            filterable=True,
+        ),
+        SearchField(
+            name="ship_to_party_name",
+            type=SearchFieldDataType.String,
+            searchable=True,
+            filterable=True,
+        ),
+        SearchField(
+            name="job_type",
+            type=SearchFieldDataType.String,
+            searchable=True,
+            filterable=True,
+        ),
+        SearchField(
+            name="mcs_hbl",
+            type=SearchFieldDataType.String,
+            searchable=True,
+            filterable=True,
+        ),
+        SearchField(
+            name="transport_mode",
+            type=SearchFieldDataType.String,
+            searchable=True,
+            filterable=True,
         ),
         # Additional metadata as blob
         SearchField(

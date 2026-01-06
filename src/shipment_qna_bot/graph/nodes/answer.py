@@ -1,5 +1,6 @@
 import json
-from typing import Any, Dict
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
 from shipment_qna_bot.logging.graph_tracing import log_node_execution
 from shipment_qna_bot.logging.logger import logger, set_log_context
@@ -13,9 +14,6 @@ def _get_chat_tool() -> AzureOpenAIChatTool:
     if _CHAT_TOOL is None:
         _CHAT_TOOL = AzureOpenAIChatTool()
     return _CHAT_TOOL
-
-
-from datetime import datetime
 
 
 def answer_node(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -57,11 +55,13 @@ def answer_node(state: Dict[str, Any]) -> Dict[str, Any]:
 
                 # Prioritize key fields
                 priority_fields = [
-                    "document_id",
                     "container_number",
                     "shipment_status",
                     "po_numbers",
                     "obl_nos",
+                    "discharge_port",
+                    "eta_dp_date",
+                    "ata_dp_date",
                 ]
                 for f in priority_fields:
                     if f in hit:
@@ -84,6 +84,7 @@ def answer_node(state: Dict[str, Any]) -> Dict[str, Any]:
                                 and k
                                 not in [
                                     "consignee_code_ids",
+                                    "consignee_codes",
                                     "id",
                                 ]  # Filter sensitive fields
                                 and len(str(v)) < 200
@@ -93,8 +94,10 @@ def answer_node(state: Dict[str, Any]) -> Dict[str, Any]:
                         pass
 
         # Pagination Hint
+        pagination_hint = ""
         if hits and len(hits) == 10:  # Assuming default top_k=10
-            context_str += "\nNOTE: There are more results. The user can ask 'next 10' to see them.\n"
+            pagination_hint = "There are more results. Ask 'next 10' to see more."
+            context_str += f"\nNOTE: {pagination_hint}\n"
 
         # 3. Add Current Date Context
         today_str = datetime.now().strftime("%Y-%m-%d")
@@ -110,7 +113,7 @@ def answer_node(state: Dict[str, Any]) -> Dict[str, Any]:
             return state
 
         # Prompt Construction
-        system_prompt = """
+        system_prompt = f"""
 Role:
 You are an expert logistics analyst assistant. 
 
@@ -199,6 +202,35 @@ c. Pagination Button (if applicable)
             if not response_text or response_text.strip() == "":
                 response_text = "I processed the data but couldn't generate a summary. Please try rephrasing your question."
 
+            def _fmt_date(val: Optional[str]) -> str:
+                if not val:
+                    return "-"
+                try:
+                    s = str(val).replace("Z", "+00:00")
+                    dt = datetime.fromisoformat(s)
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    return dt.strftime("%d-%b-%y")
+                except Exception:
+                    return str(val)
+
+            def _build_table(rows: List[Dict[str, Any]]) -> str:
+                lines = [
+                    "| Container | PO Numbers | Discharge Port | Arrival Date (ETA/ATA) |",
+                    "|---|---|---|---|",
+                ]
+                for h in rows:
+                    container = h.get("container_number") or "-"
+                    po_numbers = h.get("po_numbers") or "-"
+                    if isinstance(po_numbers, list):
+                        po_numbers = ", ".join(map(str, po_numbers))
+                    discharge_port = h.get("discharge_port") or "-"
+                    arrival = _fmt_date(h.get("ata_dp_date") or h.get("eta_dp_date"))
+                    lines.append(
+                        f"| {container} | {po_numbers} | {discharge_port} | {arrival} |"
+                    )
+                return "\n".join(lines)
+
             state["answer_text"] = response_text
 
             # --- Structured Table Construction ---
@@ -225,6 +257,34 @@ c. Pagination Button (if applicable)
                     "rows": rows,
                     "title": "Shipment List",
                 }
+
+                if "|" not in response_text:
+                    response_text = (
+                        response_text.rstrip() + "\n\n" + _build_table(hits[:10])
+                    )
+                    state["answer_text"] = response_text
+
+            # Evidence for response model
+            citations = []
+            for h in hits[:5]:
+                citations.append(
+                    {
+                        "doc_id": h.get("doc_id") or h.get("document_id"),
+                        "container_number": h.get("container_number"),
+                        "field_used": [
+                            k
+                            for k in [
+                                "shipment_status",
+                                "eta_dp_date",
+                                "ata_dp_date",
+                                "eta_fd_date",
+                                "discharge_port",
+                            ]
+                            if h.get(k) is not None
+                        ],
+                    }
+                )
+            state["citations"] = citations
 
             # In LangGraph with add_messages, we return the NEW message to be appended.
             # If we already have history, we might want to avoid bloating it with failed attempts?

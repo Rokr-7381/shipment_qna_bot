@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 
 from dotenv import find_dotenv, load_dotenv
 
@@ -42,14 +43,26 @@ class AzureOpenAIEmbeddingsClient:
         text = (text or "").strip()
         if not text:
             return []
-        try:
-            # Ensure input is a string, and wrap it in a list as expected by create method
-            text_input = str(text)
-            resp = self._client.embeddings.create(
-                model=self._deployment,
-                input=text_input,
-            )
-            return list(resp.data[0].embedding)
-        except Exception as e:
-            # Log the error or re-raise with more context
-            raise RuntimeError(f"Azure OpenAI Embedding failed: {e}") from e
+        max_retries = int(os.getenv("AZURE_OPENAI_EMBED_MAX_RETRIES", "5"))
+        base_delay = float(os.getenv("AZURE_OPENAI_EMBED_RETRY_DELAY", "1.0"))
+        last_error: Exception | None = None
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                text_input = str(text)
+                resp = self._client.embeddings.create(
+                    model=self._deployment,
+                    input=text_input,
+                )
+                return list(resp.data[0].embedding)
+            except Exception as e:
+                last_error = e
+                msg = str(e)
+                if "RateLimitReached" in msg or "429" in msg:
+                    time.sleep(base_delay * attempt)
+                    continue
+                break
+
+        raise RuntimeError(
+            f"Azure OpenAI Embedding failed: {last_error}"
+        ) from last_error

@@ -48,8 +48,11 @@ def planner_node(state: Dict[str, Any]) -> Dict[str, Any]:
         - obl_nos (Collection): e.g. OBL123. Use: obl_nos/any(o: o eq '...')
         - shipment_status (String): DELIVERED, IN_OCEAN, AT_DISCHARGE_PORT, READY_FOR_PICKUP, EMPTY_RETURNED. Use: shipment_status eq '...'
         - hot_container_flag (Boolean): true/false. Use: hot_container_flag eq true
-        - discharge_port_name (String): e.g. "Los Angeles". Use: contains(discharge_port_name, '...')
-        - mother_vessel_name (String): e.g. "MAERSK SERANGOON". Use: contains(mother_vessel_name, '...')
+        - discharge_port (String): e.g. "Los Angeles". Use: contains(discharge_port, '...')
+        - load_port (String): e.g. "Shanghai". Use: contains(load_port, '...')
+        - final_destination (String): e.g. "Dallas". Use: contains(final_destination, '...')
+        - first_vessel_name (String): e.g. "MAERSK SERANGOON". Use: contains(first_vessel_name, '...')
+        - final_vessel_name (String): e.g. "BASLE EXPRESS". Use: contains(final_vessel_name, '...')
 
         Synonyms & OData Tips:
         - "on water", "sailing" -> shipment_status eq 'IN_OCEAN'
@@ -116,13 +119,65 @@ def planner_node(state: Dict[str, Any]) -> Dict[str, Any]:
             "reason": plan_data.get("reason", "fallback"),
         }
 
+        def _safe(s: str) -> str:
+            return s.replace("'", "''")
+
+        def _any_in(field: str, values: List[str]) -> str:
+            joined = ",".join(_safe(v) for v in values if v)
+            return f"{field}/any(t: search.in(t, '{joined}', ','))"
+
         # Booster: if we have specific IDs, make sure they are in query_text
         all_ids = []
-        for k in ["container", "po", "booking", "obl"]:
+        for k in ["container_number", "po_numbers", "booking_numbers", "obl_nos"]:
             all_ids.extend(extracted.get(k) or [])
 
         if all_ids:
             plan["query_text"] = " ".join(list(set(all_ids))) + " " + plan["query_text"]
+
+        # Deterministic filters for common synonyms and IDs (only if LLM didn't set a filter)
+        if not plan.get("extra_filter"):
+            filter_clauses: List[str] = []
+
+            containers = extracted.get("container_number") or []
+            if containers:
+                parts = [f"container_number eq '{_safe(c)}'" for c in containers]
+                filter_clauses.append("(" + " or ".join(parts) + ")")
+
+            po_numbers = extracted.get("po_numbers") or []
+            if po_numbers:
+                filter_clauses.append(_any_in("po_numbers", po_numbers))
+
+            booking_numbers = extracted.get("booking_numbers") or []
+            if booking_numbers:
+                filter_clauses.append(_any_in("booking_numbers", booking_numbers))
+
+            obl_nos = extracted.get("obl_nos") or []
+            if obl_nos:
+                filter_clauses.append(_any_in("obl_nos", obl_nos))
+
+            status_keywords = [
+                s.lower() for s in (extracted.get("status_keywords") or [])
+            ]
+            status_map = {
+                "on water": "IN_OCEAN",
+                "sailing": "IN_OCEAN",
+                "in ocean": "IN_OCEAN",
+                "delivered": "DELIVERED",
+                "ready for pickup": "READY_FOR_PICKUP",
+                "empty returned": "EMPTY_RETURNED",
+                "at discharge port": "AT_DISCHARGE_PORT",
+            }
+            statuses = {status_map[k] for k in status_keywords if k in status_map}
+            if statuses:
+                parts = [f"shipment_status eq '{s}'" for s in sorted(statuses)]
+                filter_clauses.append("(" + " or ".join(parts) + ")")
+
+            if any(k in status_keywords for k in ["hot", "priority"]):
+                filter_clauses.append("hot_container_flag eq true")
+
+            if filter_clauses:
+                plan["extra_filter"] = " and ".join(filter_clauses)
+                plan["reason"] = plan.get("reason", "") + " (deterministic filters)"
 
         state["retrieval_plan"] = plan
         logger.info(f"Planned retrieval: {plan}")

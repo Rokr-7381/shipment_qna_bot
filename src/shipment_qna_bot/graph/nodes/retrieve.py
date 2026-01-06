@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, Optional
 
 from shipment_qna_bot.graph.state import RetrievalPlan
@@ -13,6 +14,80 @@ from shipment_qna_bot.tools.azure_openai_embeddings import \
 
 _SEARCH: Optional[AzureAISearchTool] = None
 _EMBED: Optional[AzureOpenAIEmbeddingsClient] = None
+
+_FILTER_FIELDS = {
+    "container_number",
+    "po_numbers",
+    "booking_numbers",
+    "obl_nos",
+    "shipment_status",
+    "hot_container_flag",
+    "container_type",
+    "destination_service",
+    "load_port",
+    "final_load_port",
+    "discharge_port",
+    "last_cy_location",
+    "place_of_receipt",
+    "place_of_delivery",
+    "final_destination",
+    "first_vessel_name",
+    "final_carrier_name",
+    "final_vessel_name",
+    "true_carrier_scac_name",
+    "etd_lp_date",
+    "etd_flp_date",
+    "eta_dp_date",
+    "eta_fd_date",
+    "revised_eta",
+    "atd_lp_date",
+    "ata_flp_date",
+    "atd_flp_date",
+    "ata_dp_date",
+    "supplier_vendor_name",
+    "manufacturer_name",
+    "ship_to_party_name",
+    "job_type",
+    "mcs_hbl",
+    "transport_mode",
+}
+
+
+def _is_filter_safe(filter_str: str) -> bool:
+    if not filter_str:
+        return True
+    # Remove quoted strings to avoid false token hits.
+    scrubbed = re.sub(r"'[^']*'", "''", filter_str)
+    tokens = re.findall(r"\b[a-zA-Z_][a-zA-Z0-9_]*\b", scrubbed)
+    if not tokens:
+        return True
+
+    keywords = {
+        "and",
+        "or",
+        "eq",
+        "ne",
+        "gt",
+        "ge",
+        "lt",
+        "le",
+        "any",
+        "all",
+        "in",
+        "true",
+        "false",
+        "null",
+        "contains",
+        "search",
+    }
+    for t in tokens:
+        if t in keywords:
+            continue
+        if len(t) == 1:  # lambda variables like p, b, o
+            continue
+        if t not in _FILTER_FIELDS:
+            return False
+    return True
 
 
 def _sync_ctx(state: Dict[str, Any]) -> None:
@@ -61,6 +136,12 @@ def retrieve_node(state: Dict[str, Any]) -> Dict[str, Any]:
             plan.get("query_text") or state.get("normalized_question") or ""
         ).strip()
         extra_filter = (plan.get("extra_filter") or "").strip() or None
+        if extra_filter and not _is_filter_safe(extra_filter):
+            logger.warning(
+                f"Dropping unsafe filter: {extra_filter}",
+                extra={"step": "NODE:Retriever"},
+            )
+            extra_filter = None
 
         # fail closed on missing consigneescope
         if not consignee_codes:
