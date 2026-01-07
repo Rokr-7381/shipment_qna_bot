@@ -62,6 +62,14 @@ def answer_node(state: Dict[str, Any]) -> Dict[str, Any]:
                     "discharge_port",
                     "eta_dp_date",
                     "ata_dp_date",
+                    "optimal_ata_dp_date",
+                    "eta_fd_date",
+                    "optimal_eta_fd_date",
+                    "delayed_dp",
+                    "dp_delayed_dur",
+                    "delayed_fd",
+                    "fd_delayed_dur",
+                    "empty_container_return_date",
                 ]
                 for f in priority_fields:
                     if f in hit:
@@ -126,6 +134,7 @@ Logistics Concepts:
 - ETA DP: Estimated Time of Arrival at Discharge Port.
 - ATA DP: Actual Time of Arrival at Discharge Port (use 'ata_dp_date' field).
 - ETA FD: Estimated Time of Arrival at Final Destination (use 'eta_fd_date' field).
+- Delay DP/FD: Use dp_delayed_dur and fd_delayed_dur when present.
 
 Result Guidelines:
 1. DATA PRESENTATION (STRICT):
@@ -144,13 +153,14 @@ Result Guidelines:
 
 3. SUMMARY:
    - Provide a brief summary of how many hot containers were found and any specific filters applied (e.g., "3 days", "Rotterdam").
+   - For status questions, include both DP delay and FD delay when available.
 
 4. PAGINATION:
    - If there are more results, include the hint: {pagination_hint}
 
 Output Format:
 a. Direct Answer / Summary
-b. Data Table
+b. Data Table (if applicable)
 c. Pagination Button (if applicable)
 """.strip()
 

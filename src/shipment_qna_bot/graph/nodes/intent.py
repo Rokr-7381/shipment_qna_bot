@@ -27,12 +27,13 @@ def intent_node(state: GraphState) -> GraphState:
         "You are an intent classifier for a Shipment Q&A Bot.\n"
         "Analyze the user's input and extract:\n"
         "1. Primary Intent: One of ['retrieval', 'analytics', 'greeting', 'end'].\n"
-        "2. All Intents: A list of all applicable intents (e.g. ['retrieval', 'complaint']).\n"
+        "2. All Intents: A list of all applicable intents (include sub-intents such as "
+        "['status', 'delay', 'eta_window', 'hot'] when relevant).\n"
         "3. Sentiment: One of ['positive', 'neutral', 'negative'].\n\n"
         "Output JSON ONLY:\n"
         "{\n"
         '  "primary_intent": "retrieval",\n'
-        '  "intents": ["retrieval"],\n'
+        '  "intents": ["retrieval", "status"],\n'
         '  "sentiment": "neutral"\n'
         "}"
     )
@@ -83,16 +84,14 @@ def intent_node(state: GraphState) -> GraphState:
         sentiment = "neutral"
         usage_metadata = state.get("usage_metadata")
 
+    logger.info(
+        f"Classified intent: {intent}",
+        extra={"extra_data": {"text_snippet": text[:50]}},
+    )
+
     return {
         "intent": intent,
         "sub_intents": sub_intents,
         "sentiment": sentiment,
         "usage_metadata": usage_metadata,
     }
-
-    logger.info(
-        f"Classified intent: {intent}",
-        extra={"extra_data": {"text_snippet": text[:50]}},
-    )
-
-    return {"intent": intent}

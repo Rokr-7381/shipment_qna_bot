@@ -21,6 +21,20 @@ def extractor_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     text = state.get("normalized_question") or state.get("question_raw") or ""
 
+    def _extract_time_window_days(raw: str) -> int | None:
+        lowered = raw.lower()
+        match = re.search(r"\b(?:next|in)\s+(\d+)\s+days?\b", lowered)
+        if match:
+            try:
+                return int(match.group(1))
+            except ValueError:
+                return None
+        if re.search(r"\bnext\s+week\b", lowered):
+            return 7
+        if re.search(r"\bnext\s+month\b", lowered):
+            return 30
+        return None
+
     # 1. Regex handles high-confidence ID formats
     # Container: 4 letters + 7 digits
     container_pattern = r"\b[a-zA-Z]{4}\d{7}\b"
@@ -118,10 +132,15 @@ def extractor_node(state: Dict[str, Any]) -> Dict[str, Any]:
         "date_range": llm_extracted.get("date_range") or [],
         "status_keywords": llm_extracted.get("status_keywords") or [],
     }
+    time_window_days = _extract_time_window_days(text)
 
     count = sum(len(v) if isinstance(v, list) else 1 for v in merged.values() if v)
     logger.info(
         f"Extracted {count} entities", extra={"extra_data": {"extracted": merged}}
     )
 
-    return {"extracted_ids": merged, "usage_metadata": usage_metadata}
+    return {
+        "extracted_ids": merged,
+        "time_window_days": time_window_days,
+        "usage_metadata": usage_metadata,
+    }

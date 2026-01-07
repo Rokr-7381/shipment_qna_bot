@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import re
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 from shipment_qna_bot.graph.state import RetrievalPlan
@@ -162,6 +164,92 @@ def retrieve_node(state: Dict[str, Any]) -> Dict[str, Any]:
             )
             vector = None
 
+        def _parse_dt(val: Any) -> Optional[datetime]:
+            if not val or val == "NaT":
+                return None
+            try:
+                s = str(val).replace("Z", "+00:00")
+                dt = datetime.fromisoformat(s)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt
+            except Exception:
+                return None
+
+        def _load_metadata(hit: Dict[str, Any]) -> Dict[str, Any]:
+            raw = hit.get("metadata_json")
+            if isinstance(raw, dict):
+                return raw
+            if isinstance(raw, str):
+                try:
+                    return json.loads(raw)
+                except Exception:
+                    return {}
+            return {}
+
+        def _hydrate_hit(hit: Dict[str, Any]) -> None:
+            meta = _load_metadata(hit)
+            for key in [
+                "optimal_ata_dp_date",
+                "optimal_eta_fd_date",
+                "dp_delayed_dur",
+                "fd_delayed_dur",
+                "delayed_dp",
+                "delayed_fd",
+                "empty_container_return_date",
+                "eta_dp_date",
+                "eta_fd_date",
+                "ata_dp_date",
+            ]:
+                if key not in hit and key in meta:
+                    hit[key] = meta.get(key)
+
+        def _post_filter_hits(
+            hits: list[Dict[str, Any]], post_filter: Dict[str, Any]
+        ) -> list[Dict[str, Any]]:
+            if not post_filter:
+                return hits
+            filtered = []
+            now = datetime.now(timezone.utc)
+            for h in hits:
+                _hydrate_hit(h)
+                meta = _load_metadata(h)
+
+                def _get_field(name: str) -> Any:
+                    if name in h:
+                        return h.get(name)
+                    return meta.get(name)
+
+                ok = True
+                date_window = post_filter.get("date_window")
+                if date_window:
+                    field = date_window.get("field")
+                    days = int(date_window.get("days") or 0)
+                    direction = date_window.get("direction", "next")
+                    dt_val = _parse_dt(_get_field(field))
+                    if not dt_val:
+                        ok = False
+                    elif direction == "next":
+                        ok = dt_val >= now and dt_val < (now + timedelta(days=days))
+
+                delay_rule = post_filter.get("delay")
+                if ok and delay_rule:
+                    field = delay_rule.get("field")
+                    op = delay_rule.get("op", ">=")
+                    try:
+                        val = float(_get_field(field) or 0.0)
+                    except Exception:
+                        val = 0.0
+                    threshold = float(delay_rule.get("days") or 0.0)
+                    if op == ">":
+                        ok = val > threshold
+                    else:
+                        ok = val >= threshold
+
+                if ok:
+                    filtered.append(h)
+            return filtered
+
         try:
             tool = _get_search()
             search_response = tool.search(
@@ -176,9 +264,18 @@ def retrieve_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 order_by=plan.get("order_by"),
             )
             hits = search_response["hits"]
+            for h in hits:
+                _hydrate_hit(h)
+            post_filter = plan.get("post_filter") or {}
+            if post_filter:
+                hits = _post_filter_hits(hits, post_filter)
             state["hits"] = hits
             state["idx_analytics"] = {
-                "count": search_response.get("count"),
+                "count": (
+                    len(hits)
+                    if plan.get("include_total_count")
+                    else search_response.get("count")
+                ),
                 "facets": search_response.get("facets"),
             }
             logger.info(
@@ -207,9 +304,18 @@ def retrieve_node(state: Dict[str, Any]) -> Dict[str, Any]:
                         order_by=plan.get("order_by"),
                     )
                     hits = search_response["hits"]
+                    for h in hits:
+                        _hydrate_hit(h)
+                    post_filter = plan.get("post_filter") or {}
+                    if post_filter:
+                        hits = _post_filter_hits(hits, post_filter)
                     state["hits"] = hits
                     state["idx_analytics"] = {
-                        "count": search_response.get("count"),
+                        "count": (
+                            len(hits)
+                            if plan.get("include_total_count")
+                            else search_response.get("count")
+                        ),
                         "facets": search_response.get("facets"),
                     }
                     logger.info(

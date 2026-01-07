@@ -38,6 +38,7 @@ def planner_node(state: Dict[str, Any]) -> Dict[str, Any]:
             state.get("normalized_question") or state.get("question_raw") or ""
         ).strip()
         extracted = state.get("extracted_ids") or {}
+        time_window_days = state.get("time_window_days")
 
         # Logistics mapping and synonym dictionary for the LLM
         logistics_context = """
@@ -53,10 +54,17 @@ def planner_node(state: Dict[str, Any]) -> Dict[str, Any]:
         - final_destination (String): e.g. "Dallas". Use: contains(final_destination, '...')
         - first_vessel_name (String): e.g. "MAERSK SERANGOON". Use: contains(first_vessel_name, '...')
         - final_vessel_name (String): e.g. "BASLE EXPRESS". Use: contains(final_vessel_name, '...')
+        - optimal_ata_dp_date (DateTime): Use for discharge-port arrival windows.
+        - optimal_eta_fd_date (DateTime): Use for final-destination arrival windows.
+        - dp_delayed_dur (Float): Delay in days at discharge port.
+        - fd_delayed_dur (Float): Delay in days at final destination.
+        - delayed_dp / delayed_fd (String): "on_time" or "delay".
 
         Synonyms & OData Tips:
         - "on water", "sailing" -> shipment_status eq 'IN_OCEAN'
         - "hot" -> hot_container_flag eq true
+        - If the user mentions final destination (FD), in-dc, or distribution center, use final_destination.
+        - Otherwise, use discharge_port for "arriving at <location>".
         - For ID Collections (PO, Booking, OBL), ALWAYS use 'any(p: p eq '...')' syntax.
         - For descriptive fields (Port, Vessel), 'contains(field, '...')' is more flexible than 'eq'.
     """.strip()
@@ -116,6 +124,7 @@ def planner_node(state: Dict[str, Any]) -> Dict[str, Any]:
             "top_k": plan_data.get("top_k", 20),
             "vector_k": 30,
             "extra_filter": plan_data.get("extra_filter"),
+            "post_filter": None,
             "reason": plan_data.get("reason", "fallback"),
         }
 
@@ -126,6 +135,30 @@ def planner_node(state: Dict[str, Any]) -> Dict[str, Any]:
             joined = ",".join(_safe(v) for v in values if v)
             return f"{field}/any(t: search.in(t, '{joined}', ','))"
 
+        def _mentions_final_destination(text: str) -> bool:
+            lowered = text.lower()
+            if "final destination" in lowered or "final_destination" in lowered:
+                return True
+            if "distribution center" in lowered or "distribution centre" in lowered:
+                return True
+            if re.search(r"\bin-?dc\b", lowered):
+                return True
+            if re.search(r"\bfd\b", lowered):
+                return True
+            return False
+
+        def _extract_delay_days(text: str) -> Optional[int]:
+            lowered = text.lower()
+            if "delay" not in lowered and "delayed" not in lowered:
+                return None
+            match = re.search(r"\b(\d+)\s+days?\b", lowered)
+            if match:
+                try:
+                    return int(match.group(1))
+                except ValueError:
+                    return None
+            return 0
+
         # Booster: if we have specific IDs, make sure they are in query_text
         all_ids = []
         for k in ["container_number", "po_numbers", "booking_numbers", "obl_nos"]:
@@ -134,50 +167,92 @@ def planner_node(state: Dict[str, Any]) -> Dict[str, Any]:
         if all_ids:
             plan["query_text"] = " ".join(list(set(all_ids))) + " " + plan["query_text"]
 
-        # Deterministic filters for common synonyms and IDs (only if LLM didn't set a filter)
-        if not plan.get("extra_filter"):
-            filter_clauses: List[str] = []
+        filter_clauses: List[str] = []
+        if plan.get("extra_filter"):
+            filter_clauses.append(f"({plan['extra_filter']})")
 
-            containers = extracted.get("container_number") or []
-            if containers:
-                parts = [f"container_number eq '{_safe(c)}'" for c in containers]
-                filter_clauses.append("(" + " or ".join(parts) + ")")
+        containers = extracted.get("container_number") or []
+        if containers:
+            parts = [f"container_number eq '{_safe(c)}'" for c in containers]
+            filter_clauses.append("(" + " or ".join(parts) + ")")
 
-            po_numbers = extracted.get("po_numbers") or []
-            if po_numbers:
-                filter_clauses.append(_any_in("po_numbers", po_numbers))
+        po_numbers = extracted.get("po_numbers") or []
+        if po_numbers:
+            filter_clauses.append(_any_in("po_numbers", po_numbers))
 
-            booking_numbers = extracted.get("booking_numbers") or []
-            if booking_numbers:
-                filter_clauses.append(_any_in("booking_numbers", booking_numbers))
+        booking_numbers = extracted.get("booking_numbers") or []
+        if booking_numbers:
+            filter_clauses.append(_any_in("booking_numbers", booking_numbers))
 
-            obl_nos = extracted.get("obl_nos") or []
-            if obl_nos:
-                filter_clauses.append(_any_in("obl_nos", obl_nos))
+        obl_nos = extracted.get("obl_nos") or []
+        if obl_nos:
+            filter_clauses.append(_any_in("obl_nos", obl_nos))
 
-            status_keywords = [
-                s.lower() for s in (extracted.get("status_keywords") or [])
-            ]
-            status_map = {
-                "on water": "IN_OCEAN",
-                "sailing": "IN_OCEAN",
-                "in ocean": "IN_OCEAN",
-                "delivered": "DELIVERED",
-                "ready for pickup": "READY_FOR_PICKUP",
-                "empty returned": "EMPTY_RETURNED",
-                "at discharge port": "AT_DISCHARGE_PORT",
+        status_keywords = [s.lower() for s in (extracted.get("status_keywords") or [])]
+        status_map = {
+            "on water": "IN_OCEAN",
+            "sailing": "IN_OCEAN",
+            "in ocean": "IN_OCEAN",
+            "delivered": "DELIVERED",
+            "ready for pickup": "READY_FOR_PICKUP",
+            "empty returned": "EMPTY_RETURNED",
+            "at discharge port": "AT_DISCHARGE_PORT",
+        }
+        statuses = {status_map[k] for k in status_keywords if k in status_map}
+        if statuses:
+            parts = [f"shipment_status eq '{s}'" for s in sorted(statuses)]
+            filter_clauses.append("(" + " or ".join(parts) + ")")
+
+        if any(k in status_keywords for k in ["hot", "priority"]):
+            filter_clauses.append("hot_container_flag eq true")
+
+        locations = extracted.get("location") or []
+        if locations:
+            location_field = (
+                "final_destination"
+                if _mentions_final_destination(q)
+                else "discharge_port"
+            )
+            parts = [f"contains({location_field}, '{_safe(loc)}')" for loc in locations]
+            filter_clauses.append("(" + " or ".join(parts) + ")")
+
+        if filter_clauses:
+            plan["extra_filter"] = " and ".join(filter_clauses)
+            plan["reason"] = plan.get("reason", "") + " (deterministic filters)"
+
+        post_filter: Dict[str, Any] = {}
+        if time_window_days:
+            date_field = (
+                "optimal_eta_fd_date"
+                if _mentions_final_destination(q)
+                else "optimal_ata_dp_date"
+            )
+            post_filter["date_window"] = {
+                "field": date_field,
+                "days": time_window_days,
+                "direction": "next",
             }
-            statuses = {status_map[k] for k in status_keywords if k in status_map}
-            if statuses:
-                parts = [f"shipment_status eq '{s}'" for s in sorted(statuses)]
-                filter_clauses.append("(" + " or ".join(parts) + ")")
+            if "order_by" not in plan or not plan["order_by"]:
+                plan["order_by"] = (
+                    "eta_fd_date desc"
+                    if date_field == "optimal_eta_fd_date"
+                    else "eta_dp_date desc"
+                )
+            plan["top_k"] = max(plan.get("top_k", 20), 100)
 
-            if any(k in status_keywords for k in ["hot", "priority"]):
-                filter_clauses.append("hot_container_flag eq true")
+        delay_days = _extract_delay_days(q)
+        if delay_days is not None:
+            delay_field = (
+                "fd_delayed_dur" if _mentions_final_destination(q) else "dp_delayed_dur"
+            )
+            post_filter["delay"] = {
+                "field": delay_field,
+                "op": ">=" if delay_days else ">",
+                "days": delay_days,
+            }
 
-            if filter_clauses:
-                plan["extra_filter"] = " and ".join(filter_clauses)
-                plan["reason"] = plan.get("reason", "") + " (deterministic filters)"
+        if post_filter:
+            plan["post_filter"] = post_filter
 
         state["retrieval_plan"] = plan
         logger.info(f"Planned retrieval: {plan}")
