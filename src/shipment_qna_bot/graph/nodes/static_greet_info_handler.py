@@ -265,7 +265,13 @@ def _select_section_key(question: str) -> str:
         return "services"
     if _contains_any(lowered, {"history", "founded", "anniversary", "established"}):
         return "history"
-    if _contains_any(lowered, {"vision", "mission", "values"}):
+    if _contains_any(lowered, {"vision", "mission"}):
+        return "vision"
+    if "value" in lowered:
+        # If they specifically ask for "values" (plural) or "charts",
+        # they might want the MOL CHARTS in the CEO section.
+        # But "value" (singular) is in the Vision section.
+        # We'll return vision as primary but maybe expand context in synthesis.
         return "vision"
     if _contains_any(lowered, {"ceo", "leadership", "management", "message"}):
         return "ceo"
@@ -584,6 +590,30 @@ def build_static_overview_answer(
         matches = _extract_paragraphs_with_keywords(text, _STARLINK_TOKENS)
         if matches:
             return "\n\n".join(matches[:2]).strip()
+
+    # Special handling for Vision & Values
+    # Since "Vision" is its own section but "Values" (MOL CHARTS) is in the CEO Message,
+    # if the question mentions both, we should provide both sections to the LLM.
+    if ("vision" in lowered or "mission" in lowered) and (
+        "value" in lowered or "chart" in lowered
+    ):
+        vision_sec = _extract_section(
+            text, _SECTION_MARKERS["vision"][0], _SECTION_MARKERS["vision"][1]
+        )
+        ceo_sec = _extract_section(
+            text, _SECTION_MARKERS["ceo"][0], _SECTION_MARKERS["ceo"][1]
+        )
+        return f"{vision_sec}\n\n{ceo_sec}"
+
+    # If asking for values/charts specifically
+    if "values" in lowered or "mol chart" in lowered or "charts" in lowered:
+        ceo_sec = _extract_section(
+            text, _SECTION_MARKERS["ceo"][0], _SECTION_MARKERS["ceo"][1]
+        )
+        vision_sec = _extract_section(
+            text, _SECTION_MARKERS["vision"][0], _SECTION_MARKERS["vision"][1]
+        )
+        return f"{vision_sec}\n\n{ceo_sec}"
 
     section_key = _select_section_key(question)
     if section_key == "offices":
