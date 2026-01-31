@@ -23,6 +23,10 @@ docs/
 !docs/overview_info.md
 !docs/.gitkeep
 data/
+data_cache/
+flow_cache/
+integration_cache/
+temp_cache/
 data/final_verify_output.txt
 logs_debug.txt
 src/shipment_qna_bot/logs/

@@ -76,7 +76,9 @@ def build_graph():
 
     # Retrieval Flow
     workflow.add_edge("planner", "retrieve")
-    workflow.add_edge("analytics_planner", "retrieve")
+    workflow.add_edge(
+        "analytics_planner", "judge"
+    )  # Output of analytics is a final answer, skip retrieval/answer
     workflow.add_edge("retrieve", "answer")
     workflow.add_edge("answer", "judge")
     workflow.add_edge("static_info", END)

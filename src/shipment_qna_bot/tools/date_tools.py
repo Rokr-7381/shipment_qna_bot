@@ -4,9 +4,9 @@ from typing import Any, Dict
 
 def get_today_date() -> str:
     """
-    Returns the current date in YYYY-MM-DD format.
+    Returns the current date in YYYY-MMM-DD format.
     """
-    return datetime.now().strftime("%Y-%m-%d")
+    return datetime.now().strftime("%Y-%b-%d")
 
 
 GET_TODAY_DATE_SCHEMA = {
