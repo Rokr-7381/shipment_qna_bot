@@ -101,14 +101,22 @@ Sample Data:
 3. If the user asks for a list/table, `result` should be that DataFrame or Series.
 4. If the user asks for a chart/plot, `result` should be the data for the plot (the engine will handle format).
 5. Prefer `value_counts()`, `groupby()`, `mean()`, etc.
-6. Return ONLY the code inside a ```python``` block. Do not explain.
+6. Return ONLY the code inside a ```python``` block. And explain why.
+7. Use `contains()` while filtering text based columns.
 
-## Example
+## Examples:
 User: "How many delivered shipments?"
 Code:
 ```python
 result = df[df['status'] == 'DELIVERED'].shape[0]
 ```
+User: "How many container are coming from [LOAD_PORT] to [DISCHARGE_PORT]?
+Code:
+```python
+mask = (df['load_port'].str.contains('LOAD_PORT')) & (df['discharge_port'].str.contains('DISCHARGE_PORT'))
+result = df[mask].shape[0]
+```
+
 """
 
         messages = [

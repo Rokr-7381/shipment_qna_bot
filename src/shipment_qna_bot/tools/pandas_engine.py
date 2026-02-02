@@ -14,7 +14,7 @@ class PandasAnalyticsEngine:
     """
     Safely executes Python/Pandas code on a provided DataFrame.
     Use this to perform aggregations, filtering, and detailed analysis that
-    vector search cannot handle (e.g., "average weight", "count delays by port").
+    vector search cannot handle (e.g., "average weight", "count delays by port", "delay to port").
     """
 
     def __init__(self):

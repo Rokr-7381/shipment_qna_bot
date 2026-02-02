@@ -176,6 +176,17 @@ class BlobAnalyticsManager:
 
             filtered_df = df.loc[valid_indices].copy()
 
+            # Convert numeric columns from string to numeric
+            numeric_cols = [
+                "cargo_weight_kg",
+                "cargo_measure_cubic_meter",
+                "cargo_count",
+                "cargo_detail_count",
+            ]
+            for col in numeric_cols:
+                if col in filtered_df.columns:
+                    filtered_df[col] = pd.to_numeric(filtered_df[col], errors="coerce")
+
             logger.info(
                 f"Loaded {len(filtered_df)} rows for codes {consignee_codes[:3]}..."
             )
