@@ -105,7 +105,7 @@ ANALYTICS_METADATA = {
     # },
     "predictive_dp_date": {
         "desc": "Predictive Discharge Port Date. DEFAULT column for arrival/delay calculations unless Final Destination (FD) is specified.",
-        "type": "datetime"
+        "type": "datetime",
     },
     "cargo_receiveds_date": {
         "desc": "Definition for cargo receiveds date.",

@@ -247,12 +247,15 @@ def answer_node(state: Dict[str, Any]) -> Dict[str, Any]:
         ready_ref_content = ""
         try:
             import os
+
             # Try relative path first (assuming running from root)
             ready_ref_path = "docs/ready_ref.md"
             if not os.path.exists(ready_ref_path):
-                 # Fallback: try absolute path based on file location
-                 base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../"))
-                 ready_ref_path = os.path.join(base_dir, "docs", "ready_ref.md")
+                # Fallback: try absolute path based on file location
+                base_dir = os.path.abspath(
+                    os.path.join(os.path.dirname(__file__), "../../../../")
+                )
+                ready_ref_path = os.path.join(base_dir, "docs", "ready_ref.md")
 
             if os.path.exists(ready_ref_path):
                 with open(ready_ref_path, "r") as f:
@@ -265,7 +268,7 @@ def answer_node(state: Dict[str, Any]) -> Dict[str, Any]:
             # Swap columns based on orientation
             # Refactor: We now include ALL relevant columns in the context and let the LLM
             # (guided by ready_ref.md) decide what to focus on.
-            
+
             for i, hit in enumerate(hits[:10]):
                 context_str += f"\n--- Document {i+1} ---\n"
 
@@ -299,7 +302,7 @@ def answer_node(state: Dict[str, Any]) -> Dict[str, Any]:
                     "cargo_detail_count",
                     # Priority Flags
                     "hot_container_flag",
-                    "empty_container_return_date"
+                    "empty_container_return_date",
                 ]
 
                 for f in priority_fields:

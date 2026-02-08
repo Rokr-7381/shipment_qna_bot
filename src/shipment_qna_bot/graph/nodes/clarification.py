@@ -1,17 +1,21 @@
 from typing import Any, Dict, Optional, cast
+
 from langchain_core.messages import AIMessage, HumanMessage
+
+from shipment_qna_bot.graph.state import GraphState
 from shipment_qna_bot.logging.graph_tracing import log_node_execution
 from shipment_qna_bot.logging.logger import logger, set_log_context
 from shipment_qna_bot.tools.azure_openai_chat import AzureOpenAIChatTool
-from shipment_qna_bot.graph.state import GraphState
 
 _chat_tool: Optional[AzureOpenAIChatTool] = None
+
 
 def _get_chat_tool() -> AzureOpenAIChatTool:
     global _chat_tool
     if _chat_tool is None:
         _chat_tool = AzureOpenAIChatTool()
     return _chat_tool
+
 
 def clarification_node(state: GraphState) -> GraphState:
     """
@@ -38,16 +42,16 @@ def clarification_node(state: GraphState) -> GraphState:
         )
 
         messages = [{"role": "system", "content": system_prompt}]
-        
+
         # Add history for context (optional, but good for flow)
         # We limit history to avoid huge context, just last few turns + current question
         for msg in history[-4:]:
             role = "user" if isinstance(msg, HumanMessage) else "assistant"
             messages.append({"role": role, "content": str(msg.content)})
-        
+
         # Ensure the current question is at the end if not already in history (it should be)
         if not history or history[-1].content != question:
-             messages.append({"role": "user", "content": question})
+            messages.append({"role": "user", "content": question})
 
         try:
             chat = _get_chat_tool()
@@ -57,11 +61,13 @@ def clarification_node(state: GraphState) -> GraphState:
             state["answer_text"] = clarification_text
             state["messages"] = [AIMessage(content=clarification_text)]
             # We treat this as 'satisfied' because we want to stop execution and wait for user input.
-            state["is_satisfied"] = True 
-            
+            state["is_satisfied"] = True
+
         except Exception as e:
             logger.error(f"Clarification generation failed: {e}")
-            state["answer_text"] = "I'm not sure I understood. Could you please provide more details?"
+            state["answer_text"] = (
+                "I'm not sure I understood. Could you please provide more details?"
+            )
             state["is_satisfied"] = True
 
     return state

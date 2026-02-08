@@ -91,35 +91,38 @@ def analytics_planner_node(state: Dict[str, Any]) -> Dict[str, Any]:
         # Load Ready Reference if available
         ready_ref_content = ""
         try:
-            # Assuming docs is at the root of the project, relative to this file? 
+            # Assuming docs is at the root of the project, relative to this file?
             # This file is in src/shipment_qna_bot/graph/nodes/
             # docs is in docs/
             # So we need to go up 4 levels? .../src/shipment_qna_bot/graph/nodes/../../../../docs/ready_ref.md
             # Better to use a relative path from the CWD if we assume running from root
             import os
+
             ready_ref_path = "docs/ready_ref.md"
             if os.path.exists(ready_ref_path):
                 with open(ready_ref_path, "r") as f:
                     ready_ref_content = f.read()
             else:
-                 # Fallback: try absolute path based on file location
-                 base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../"))
-                 ready_ref_path = os.path.join(base_dir, "docs", "ready_ref.md")
-                 if os.path.exists(ready_ref_path):
-                     with open(ready_ref_path, "r") as f:
-                         ready_ref_content = f.read()
+                # Fallback: try absolute path based on file location
+                base_dir = os.path.abspath(
+                    os.path.join(os.path.dirname(__file__), "../../../../")
+                )
+                ready_ref_path = os.path.join(base_dir, "docs", "ready_ref.md")
+                if os.path.exists(ready_ref_path):
+                    with open(ready_ref_path, "r") as f:
+                        ready_ref_content = f.read()
         except Exception as e:
             logger.warning(f"Could not load ready_ref.md: {e}")
 
         col_ref = ""
-        # If we have ready_ref, we might not need the auto-generated list, 
+        # If we have ready_ref, we might not need the auto-generated list,
         # but let's keep the auto-generated one for now as a fallback or concise list if ready_ref is missing columns.
         # Actually, the user wants the ready_ref to be THE source.
         # But for now, let's append the ready ref to the context.
-        
+
         for k, v in ANALYTICS_METADATA.items():
-             if k in columns:
-                 col_ref += f"- `{k}`: {v['desc']} (Type: {v['type']})\n"
+            if k in columns:
+                col_ref += f"- `{k}`: {v['desc']} (Type: {v['type']})\n"
 
         system_prompt = f"""
 You are a Pandas Data Analyst. You have access to a DataFrame `df` containing shipment data.
