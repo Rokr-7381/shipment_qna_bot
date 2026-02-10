@@ -83,12 +83,43 @@ def analytics_planner_node(state: Dict[str, Any]) -> Dict[str, Any]:
 
         # 2. Prepare Context for LLM
         columns = list(df.columns)
-        # Head sample (first 3 rows) to help LLM understand values
-        head_sample = df.head(3).to_markdown(index=False)
+        # Head sample (first 5 rows) to help LLM understand values
+        head_sample = df.head(5).to_markdown(index=False)
         shape_info = f"Rows: {df.shape[0]}, Columns: {df.shape[1]}"
 
         # Dynamic Column Reference
+        # Load Ready Reference if available
+        ready_ref_content = ""
+        try:
+            # Assuming docs is at the root of the project, relative to this file path
+            # This file is in src/shipment_qna_bot/graph/nodes/
+            # docs is in docs/
+            # So we need to go up 4 levels: .../src/shipment_qna_bot/graph/nodes/../../../../docs/ready_ref.md
+            # Better to use a relative path from the CWD if we assume running from root
+            import os
+
+            ready_ref_path = "docs/ready_ref.md"
+            if os.path.exists(ready_ref_path):
+                with open(ready_ref_path, "r") as f:
+                    ready_ref_content = f.read()
+            else:
+                # Fallback: try absolute path based on file location
+                base_dir = os.path.abspath(
+                    os.path.join(os.path.dirname(__file__), "../../../../")
+                )
+                ready_ref_path = os.path.join(base_dir, "docs", "ready_ref.md")
+                if os.path.exists(ready_ref_path):
+                    with open(ready_ref_path, "r") as f:
+                        ready_ref_content = f.read()
+        except Exception as e:
+            logger.warning(f"Could not load ready_ref.md: {e}")
+
         col_ref = ""
+        # We have ready_ref, we might not need the auto-generated list,
+        # but let's keep the auto-generated one for now as a fallback or concise list if ready_ref is missing columns.
+        # Actually, the ready_ref to be THE source for LLM understanding.
+        # Now, let's append the ready ref to the context.
+
         for k, v in ANALYTICS_METADATA.items():
             if k in columns:
                 col_ref += f"- `{k}`: {v['desc']} (Type: {v['type']})\n"
@@ -102,6 +133,9 @@ Today's Date: {state.get('today_date')}
 
 ## Key Column Reference
 {col_ref}
+
+## Operational Reference (Ready Ref)
+{ready_ref_content}
 
 ## Dataset Schema
 Columns: {columns}
@@ -117,7 +151,10 @@ Sample Data:
 5. **STRICT RULE:** Never include internal technical columns like {INTERNAL_COLUMNS} in the final `result`.
 6. **RELEVANCE:** When returning a DataFrame/table, select only the columns relevant to the user's question.
 7. **DATE FORMATTING:** Whenever displaying or returning a datetime column in a result, ALWAYS use `.dt.strftime('%d-%b-%Y')` to ensure a clean, user-friendly format (e.g., '22-Jul-2025').
-8. Use `str.contains(..., na=False, case=False)` for flexible text filtering.
+8. **COLUMN SELECTION:**
+   - DEFAULT to using `optimal_ata_dp_date` for arrival/delay calculations (unless value is null, then fall back to `eta_dp_date`).
+   - ONLY use `etd_fd_date` (or `eta_fd_date`) if the user explicitly asks for "Final Destination" (FD) or "In-CD".
+9. Use `str.contains(..., na=False, case=False, regex=True)` for flexible text filtering.
 9. Return ONLY the code inside a ```python``` block. Explain your logic briefly outside the block.
 
 ## Examples:
@@ -139,11 +176,11 @@ Code:
 result = df['final_carrier_name'].dropna().unique().tolist()
 ```
 
-User: "Show me shipments with more than 5 days delay at discharge port."
+User: "Show me shipments with more than 5 days delay."
 Code:
 ```python
 # Select only relevant columns and format dates
-cols = ['container_number', 'eta_dp_date', 'optimal_ata_dp_date', 'dp_delayed_dur', 'discharge_port']
+cols = ['container_number', 'po_numbers', 'eta_dp_date', 'optimal_ata_dp_date', 'dp_delayed_dur', 'discharge_port']
 df_filtered = df[df['dp_delayed_dur'] > 5].copy()
 # Apply date formatting
 df_filtered['eta_dp_date'] = df_filtered['eta_dp_date'].dt.strftime('%d-%b-%Y')
@@ -155,7 +192,7 @@ User: "List shipments departing next week."
 Code:
 ```python
 # Use etd_lp_date for estimated departures
-cols = ['container_number', 'etd_lp_date', 'load_port']
+cols = ['container_number', 'po_numbers', 'etd_lp_date', 'load_port']
 df_filtered = df[df['etd_lp_date'].dt.isocalendar().week == (today_week + 1)].copy()
 df_filtered['etd_lp_date'] = df_filtered['etd_lp_date'].dt.strftime('%d-%b-%Y')
 result = df_filtered[cols]
