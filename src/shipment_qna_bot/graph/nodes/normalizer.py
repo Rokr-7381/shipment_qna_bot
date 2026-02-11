@@ -162,7 +162,11 @@ def normalize_node(state: GraphState) -> Dict[str, Any]:
         if pending:
             choice = _parse_topic_shift_choice(question)
             if choice:
-                chosen = pending.get("normalized") if choice == "use_previous" else pending.get("raw")
+                chosen = (
+                    pending.get("normalized")
+                    if choice == "use_previous"
+                    else pending.get("raw")
+                )
                 chosen = (chosen or question).strip()
                 state["question_raw"] = chosen
                 state["normalized_question"] = chosen.lower()

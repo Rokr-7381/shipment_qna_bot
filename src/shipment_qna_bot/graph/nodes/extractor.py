@@ -23,10 +23,15 @@ def extractor_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     with log_node_execution(
         "Extractor",
-        {"question": (state.get("normalized_question") or state.get("question_raw") or "")[:120]},
+        {
+            "question": (
+                state.get("normalized_question") or state.get("question_raw") or ""
+            )[:120]
+        },
         state_ref=state,
     ):
         text = state.get("normalized_question") or state.get("question_raw") or ""
+
         def _extract_time_window_days(raw: str) -> int | None:
             lowered = raw.lower()
             match = re.search(r"\b(?:next|in)\s+(\d+)\s+days?\b", lowered)
@@ -135,7 +140,9 @@ def extractor_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 set(
                     [
                         x.upper()
-                        for x in (bookings + (llm_extracted.get("booking_numbers") or []))
+                        for x in (
+                            bookings + (llm_extracted.get("booking_numbers") or [])
+                        )
                     ]
                 )
             ),

@@ -656,7 +656,11 @@ def build_static_overview_answer(
 def static_greet_info_node(state: GraphState) -> GraphState:
     with log_node_execution(
         "StaticInfo",
-        {"question": (state.get("normalized_question") or state.get("question_raw") or "")[:120]},
+        {
+            "question": (
+                state.get("normalized_question") or state.get("question_raw") or ""
+            )[:120]
+        },
         state_ref=state,
     ):
         question = state.get("normalized_question") or state.get("question_raw") or ""
