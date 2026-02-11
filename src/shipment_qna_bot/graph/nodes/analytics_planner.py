@@ -81,6 +81,11 @@ def analytics_planner_node(state: Dict[str, Any]) -> Dict[str, Any]:
         except Exception as e:
             logger.error(f"Analytics Data Load Failed: {e}")
             state.setdefault("errors", []).append(f"Data Load Error: {e}")
+            state["answer_text"] = (
+                "I couldn't load the analytics dataset right now. "
+                "Please try again in a moment."
+            )
+            state["is_satisfied"] = True
             return state
 
         # 2. Prepare Context for LLM
@@ -227,11 +232,21 @@ result = df_filtered[cols]
         except Exception as e:
             logger.error(f"LLM Code Gen Failed: {e}")
             state.setdefault("errors", []).append(f"Code Gen Error: {e}")
+            state["answer_text"] = (
+                "I couldn't generate the analytics query in time. "
+                "Please narrow the request or try again."
+            )
+            state["is_satisfied"] = True
             return state
 
         # 4. Execute Code
         if not generated_code:
             state.setdefault("errors", []).append("LLM produced no code.")
+            state["answer_text"] = (
+                "I couldn't generate a valid analytics query for that question. "
+                "Please rephrase or add more detail."
+            )
+            state["is_satisfied"] = True
             return state
 
         engine = _get_pandas_engine()
@@ -250,8 +265,10 @@ result = df_filtered[cols]
             # We can allow the Judge to see this or retry.
             # For now, let's treat it as a failure to satisfy.
             state.setdefault("errors", []).append(f"Analysis Failed: {error_msg}")
-            state["is_satisfied"] = (
-                False  # Logic might trigger retry if Judge sees this.
+            state["answer_text"] = (
+                "I couldn't run that analytics query successfully. "
+                "Please try narrowing the request or rephrasing."
             )
+            state["is_satisfied"] = True
 
     return state

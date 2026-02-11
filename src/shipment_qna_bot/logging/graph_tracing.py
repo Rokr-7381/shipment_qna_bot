@@ -69,7 +69,6 @@ from contextlib import contextmanager
 from typing import Any, Dict, Generator, Optional
 
 
-@contextmanager
 def _truncate(val: Any, limit: int = 160) -> str:
     if val is None:
         return ""
@@ -129,19 +128,9 @@ def log_node_execution(
     """
     context = context or {}
     logger.info(f"Node execution started: {node_name}", extra={"extra_data": context})
-    if state_ref is not None:
-        logger.info(
-            f"Node input: {node_name}",
-            extra={"extra_data": _summarize_state(state_ref)},
-        )
     try:
         yield
         logger.info(f"Node execution completed: {node_name}")
-        if state_ref is not None:
-            logger.info(
-                f"Node output: {node_name}",
-                extra={"extra_data": _summarize_state(state_ref)},
-            )
     except Exception as e:
         logger.error(f"Node execution failed: {node_name} - {e}", exc_info=True)
         raise

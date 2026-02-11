@@ -193,3 +193,29 @@ result = df_filtered[[
     'shipment_status'
 ]]
 ```
+
+### Scenario E: Next 5-Day Container Schedule (Nashville Example)
+**User Query:** "Next 5 day container schedule for Nashville" (or "shipments coming in next 10 days at Savannah")
+**Logic:**
+- Arrival window based on `optimal_ata_dp_date`
+- Filter: `discharge_port` contains the city
+- Display Protocol: Show container, PO, arrival date, load port, discharge port.
+
+**Pandas Code:**
+```python
+today = pd.Timestamp.today().normalize()
+next_5_days = today + pd.Timedelta(days=5)
+
+# Filter for shipments with discharge port containing "Nashville" arriving within the next 5 days
+df_filtered = df[
+    df['discharge_port'].str.contains('nashville', na=False, case=False) &
+    (df['optimal_ata_dp_date'] >= today) &
+    (df['optimal_ata_dp_date'] <= next_5_days)
+].copy()
+
+# Format the arrival date column
+df_filtered['optimal_ata_dp_date'] = df_filtered['optimal_ata_dp_date'].dt.strftime('%d-%b-%Y')
+
+# Select relevant columns
+result = df_filtered[['container_number', 'po_numbers', 'load_port', 'discharge_port', 'optimal_ata_dp_date']]
+```
