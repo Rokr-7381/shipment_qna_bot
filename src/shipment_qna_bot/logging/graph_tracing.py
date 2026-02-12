@@ -69,7 +69,6 @@ from contextlib import contextmanager
 from typing import Any, Dict, Generator, Optional
 
 
-@contextmanager
 def _truncate(val: Any, limit: int = 160) -> str:
     if val is None:
         return ""
@@ -99,23 +98,26 @@ def _summarize_state(state: Dict[str, Any]) -> Dict[str, Any]:
         "is_satisfied": state.get("is_satisfied"),
         "messages_count": len(state.get("messages") or []),
         "hits_count": len(state.get("hits") or []),
-        "idx_analytics_count": idx_analytics.get("count")
-        if isinstance(idx_analytics, dict)
-        else None,
+        "idx_analytics_count": (
+            idx_analytics.get("count") if isinstance(idx_analytics, dict) else None
+        ),
         "citations_count": len(state.get("citations") or []),
         "errors_count": len(state.get("errors") or []),
         "notices_count": len(state.get("notices") or []),
-        "table_rows": len(table_spec.get("rows") or [])
-        if isinstance(table_spec, dict)
-        else None,
+        "table_rows": (
+            len(table_spec.get("rows") or []) if isinstance(table_spec, dict) else None
+        ),
         "chart_kind": chart_spec.get("kind") if isinstance(chart_spec, dict) else None,
-        "topic_shift_added": topic_shift_candidate.get("added")
-        if isinstance(topic_shift_candidate, dict)
-        else None,
+        "topic_shift_added": (
+            topic_shift_candidate.get("added")
+            if isinstance(topic_shift_candidate, dict)
+            else None
+        ),
         "pending_topic_shift": True if pending_topic_shift else False,
     }
 
 
+@contextmanager
 def log_node_execution(
     node_name: str,
     context: Optional[Dict[str, Any]] = None,
@@ -126,19 +128,9 @@ def log_node_execution(
     """
     context = context or {}
     logger.info(f"Node execution started: {node_name}", extra={"extra_data": context})
-    if state_ref is not None:
-        logger.info(
-            f"Node input: {node_name}",
-            extra={"extra_data": _summarize_state(state_ref)},
-        )
     try:
         yield
         logger.info(f"Node execution completed: {node_name}")
-        if state_ref is not None:
-            logger.info(
-                f"Node output: {node_name}",
-                extra={"extra_data": _summarize_state(state_ref)},
-            )
     except Exception as e:
         logger.error(f"Node execution failed: {node_name} - {e}", exc_info=True)
         raise

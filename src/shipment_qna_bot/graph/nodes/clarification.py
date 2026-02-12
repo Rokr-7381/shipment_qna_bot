@@ -35,7 +35,11 @@ def clarification_node(state: GraphState) -> GraphState:
         topic_shift = state.get("topic_shift_candidate")
         if isinstance(topic_shift, dict) and topic_shift:
             raw_q = topic_shift.get("raw") or question
-            norm_q = topic_shift.get("normalized") or state.get("normalized_question") or question
+            norm_q = (
+                topic_shift.get("normalized")
+                or state.get("normalized_question")
+                or question
+            )
             added = topic_shift.get("added") or []
             reason = ", ".join(added) if added else "prior context"
 

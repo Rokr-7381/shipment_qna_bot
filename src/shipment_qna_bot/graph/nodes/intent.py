@@ -52,7 +52,15 @@ def intent_node(state: GraphState) -> GraphState:
             lowered = text.lower()
             greeting_words = {"hi", "hello", "hey", "good morning", "good afternoon"}
             analytics_words = {"chart", "graph", "analytics", "breakdown", "bucket"}
-            exit_words = {"bye", "goodbye", "quit", "exit", "end", "thank you", "thanks"}
+            exit_words = {
+                "bye",
+                "goodbye",
+                "quit",
+                "exit",
+                "end",
+                "thank you",
+                "thanks",
+            }
 
             intent = "retrieval"
             if any(w in lowered for w in greeting_words):
@@ -153,7 +161,9 @@ def intent_node(state: GraphState) -> GraphState:
                 sub_intents = data.get("intents", [])
                 sentiment = data.get("sentiment", "neutral").lower()
             except json.JSONDecodeError:
-                logger.warning(f"Intent classification JSON parse failed. Raw: {content}")
+                logger.warning(
+                    f"Intent classification JSON parse failed. Raw: {content}"
+                )
                 intent = "retrieval"
                 sub_intents = ["retrieval"]
                 sentiment = "neutral"

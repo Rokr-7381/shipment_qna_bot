@@ -25,6 +25,7 @@ class AzureOpenAIEmbeddingsClient:
         if self._test_mode:
             self._deployment = "test"
             self._client = None
+            self._timeout_s = None
             return
 
         endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
@@ -40,11 +41,18 @@ class AzureOpenAIEmbeddingsClient:
             )
 
         self._deployment = deployment
+        self._timeout_s = float(
+            os.getenv(
+                "AZURE_OPENAI_EMBED_TIMEOUT", os.getenv("AZURE_OPENAI_TIMEOUT", "30")
+            )
+        )
         self._client = AzureOpenAI(
             azure_endpoint=endpoint,
             # azure_deployment=deployment,
             api_key=api_key,
             api_version=api_version,
+            timeout=self._timeout_s,
+            max_retries=int(os.getenv("AZURE_OPENAI_EMBED_MAX_RETRIES", "5")),
         )
 
     def embed_query(self, text: str) -> List[float]:
@@ -80,6 +88,7 @@ class AzureOpenAIEmbeddingsClient:
                 resp = self._client.embeddings.create(
                     model=self._deployment,
                     input=text_input,
+                    timeout=self._timeout_s,
                 )
                 return list(resp.data[0].embedding)
             except Exception as e:

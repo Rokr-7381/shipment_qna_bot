@@ -19,10 +19,14 @@ class AzureOpenAIChatTool:
             self.azure_endpoint = "test"
             self.deployment_name = "test"
             self.client = None
+            self.timeout_s = None
+            self.max_retries = 0
             return
 
         self.api_key = os.getenv("AZURE_OPENAI_API_KEY")
         self.api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview")
+        self.timeout_s = float(os.getenv("AZURE_OPENAI_TIMEOUT", "60"))
+        self.max_retries = int(os.getenv("AZURE_OPENAI_MAX_RETRIES", "2"))
 
         # Support multiple naming conventions
         self.azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT") or os.getenv(
@@ -53,6 +57,8 @@ class AzureOpenAIChatTool:
             api_key=self.api_key,
             api_version=self.api_version,
             azure_endpoint=self.azure_endpoint,
+            timeout=self.timeout_s,
+            max_retries=self.max_retries,
         )
 
     def chat_completion(
@@ -84,6 +90,8 @@ class AzureOpenAIChatTool:
                 "temperature": temperature,
                 "max_tokens": max_tokens,
             }
+            if self.timeout_s:
+                kwargs["timeout"] = self.timeout_s
             if tools:
                 kwargs["tools"] = tools
             if tool_choice:
